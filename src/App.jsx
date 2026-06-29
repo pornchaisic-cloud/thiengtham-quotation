@@ -4,7 +4,9 @@ import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { supabase, BUCKET_NAME } from "./lib/supabase";
-// Stage4 prep for PDF preview
+import * as XLSX from "xlsx";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 // Helper: ตรวจสอบว่ารันบน native app (Android/iOS) หรือไม่
 function isNative() {
@@ -674,15 +676,6 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
 
   // สร้าง Excel Blob (ใช้ร่วมกันทั้ง Download และ Open)
   async function buildExcelBlob() {
-    if (!window.XLSX) {
-      await new Promise((res, rej) => {
-        const s = document.createElement("script");
-        s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
-    const XLSX = window.XLSX;
     const rows = [
       ["ใบเสนอราคา / QUOTATION"],
       ["", "เที่ยงทำ ดีเวลล็อปเมนท์"],
@@ -762,19 +755,8 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
     }
   }
 
-  // compat alias
-  async function handleExcelExport() { return handleExcelDownload(); }
-
   // สร้าง PDF Blob (ใช้ร่วมกันทั้ง Download และ Open)
   async function buildPdfBlob() {
-    const loadScript = (src) => new Promise((res, rej) => {
-      if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
-      const s = document.createElement("script");
-      s.src = src; s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
-    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
 
     const items = (quote.items || []).map((item, i) =>
       `<tr>
@@ -906,14 +888,13 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
     const el = wrapper.querySelector("#__pdf_root");
     await new Promise(r => setTimeout(r, 400));
 
-    const canvas = await window.html2canvas(el, {
+    const canvas = await html2canvas(el, {
       scale: 2, useCORS: true, allowTaint: true,
       backgroundColor: "#ffffff", logging: false,
       width: 740, windowWidth: 740,
     });
     document.body.removeChild(wrapper);
 
-    const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const imgData = canvas.toDataURL("image/jpeg", 0.92);
     const pdfW = 210;
@@ -1069,25 +1050,12 @@ function PriceDbScreen({ priceDb, setPriceDb, showToast, navTo }) {
 
   const filtered = useMemo(() => priceDb.filter(p => !search || p.name.includes(search)), [priceDb, search]);
 
-  // โหลด SheetJS จาก CDN แบบ lazy
-  function loadSheetJS() {
-    return new Promise((resolve, reject) => {
-      if (window.XLSX) { resolve(window.XLSX); return; }
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-      script.onload = () => resolve(window.XLSX);
-      script.onerror = () => reject(new Error("โหลด SheetJS ไม่สำเร็จ"));
-      document.head.appendChild(script);
-    });
-  }
-
   async function handleExcelImport(e) {
     const file = e.target.files[0];
     if (!file) return;
     setImporting(true);
     e.target.value = "";
     try {
-      const XLSX = await loadSheetJS();
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];
