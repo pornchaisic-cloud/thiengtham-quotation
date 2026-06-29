@@ -97,6 +97,16 @@ function thaiDateStr(d) {
   return dt.toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
 }
 
+function getItemNumbers(items) {
+  const nums = []; let cat = 0, sub = 0, afterCat = false, seq = 0;
+  for (const item of items || []) {
+    if (item.type === "category") { cat++; nums.push(String(cat)); sub = 0; afterCat = true }
+    else if (afterCat) { sub++; nums.push(cat + "." + sub) }
+    else { seq++; nums.push(String(seq)) }
+  }
+  return nums;
+}
+
 // Helper: แปลงเงินบาทเป็นตัวอักษรไทย
 function ThaiBaht(Number) {
   if (!Number && Number !== 0) return "";
@@ -461,7 +471,7 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
 
   // FIX: คำนวณด้วย useMemo เพื่อความเร็ว ไม่ค้างหน้าขาว
   const { subtotal, overhead, afterOverhead, discountAmt, vat, grandTotal } = useMemo(() => {
-    const subtotal = form.items.reduce((s, i) => s + (Number(i.qty) * Number(i.price)), 0);
+    const subtotal = form.items.reduce((s, i) => s + (i.type === "category" ? 0 : Number(i.qty) * Number(i.price)), 0);
     const overhead = subtotal * (Number(form.overheadPct) / 100);
     const afterOverhead = subtotal + overhead;
     const discountAmt = Number(form.discount) || 0;
@@ -472,11 +482,15 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
   }, [form.items, form.overheadPct, form.discount, form.includeVat]);
 
   const addItem = useCallback((dbItem) => {
-    setForm(f => ({ ...f, items: [...f.items, { id: genId(), name: dbItem.name, unit: dbItem.unit, qty: 1, price: dbItem.price }] }));
+    setForm(f => ({ ...f, items: [...f.items, { id: genId(), name: dbItem.name, unit: dbItem.unit, qty: 1, price: dbItem.price, type: "item" }] }));
   }, []);
 
-  const addCustomItem = useCallback(() => {
-    setForm(f => ({ ...f, items: [...f.items, { id: genId(), name: "", unit: "งาน", qty: 1, price: 0 }] }));
+  const addBlankItem = useCallback(() => {
+    setForm(f => ({ ...f, items: [...f.items, { id: genId(), name: "", unit: "งาน", qty: 1, price: 0, type: "item" }] }));
+  }, []);
+
+  const addCategory = useCallback(() => {
+    setForm(f => ({ ...f, items: [...f.items, { id: genId(), name: "", type: "category" }] }));
   }, []);
 
   const updateItem = useCallback((id, k, v) => {
@@ -567,12 +581,15 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
               ))}
             </div>
 
-            <button onClick={addCustomItem} style={{ ...btnSm("#555"), width: "100%", padding: "10px", marginBottom: 16, borderRadius: 8, fontSize: 13 }}>+ เพิ่มรายการกำหนดเอง</button>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <button onClick={addBlankItem} style={{ ...btnSm("#555"), flex: 1, padding: "10px", borderRadius: 8, fontSize: 13 }}>+ เพิ่มรายการ</button>
+              <button onClick={addCategory} style={{ ...btnSm("#c8a96e"), flex: 1, padding: "10px", borderRadius: 8, fontSize: 13 }}>+ เพิ่มหมวดหมู่</button>
+            </div>
 
             {form.items.length === 0 && <div style={{ textAlign: "center", color: "#333", fontSize: 13, padding: "20px 0" }}>ยังไม่มีรายการ</div>}
-            {form.items.map((item, idx) => (
-              <QuoteItemRow key={item.id} item={item} idx={idx} updateItem={updateItem} removeItem={removeItem} />
-            ))}
+            {(() => { const nums = getItemNumbers(form.items); return form.items.map((item, idx) => (
+              <QuoteItemRow key={item.id} item={item} displayNo={nums[idx]} updateItem={updateItem} removeItem={removeItem} />
+            )); })()}
           </div>
         )}
 
@@ -609,12 +626,20 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
   );
 }
 
-// FIX: แยก component รายการ เพื่อป้องกัน re-render ทั้งหมด ทำให้เร็วขึ้น
-const QuoteItemRow = ({ item, idx, updateItem, removeItem }) => {
+const QuoteItemRow = ({ item, displayNo, updateItem, removeItem }) => {
+  if (item.type === "category") {
+    return (
+      <div style={{ background: "#1a1a1a", border: "1px solid #c8a96e", borderRadius: 10, padding: "10px 12px", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: "#c8a96e", fontWeight: 700, fontSize: 13, minWidth: 24 }}>{displayNo}</span>
+        <input style={{ flex: 1, background: "transparent", border: "none", color: "#e8e8e8", fontSize: 13, fontWeight: 600, outline: "none" }} value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} placeholder="ชื่อหมวดหมู่" />
+        <button onClick={() => removeItem(item.id)} style={{ background: "none", border: "none", color: "#c8423a", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>✕</button>
+      </div>
+    );
+  }
   return (
     <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px", marginBottom: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontSize: 11, color: "#555" }}>รายการที่ {idx + 1}</span>
+        <span style={{ fontSize: 11, color: "#555" }}>รายการ {displayNo}</span>
         <button onClick={() => removeItem(item.id)} style={{ background: "none", border: "none", color: "#c8423a", cursor: "pointer", fontSize: 16 }}>✕</button>
       </div>
       <input style={{ ...inputStyle, marginBottom: 6 }} value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} placeholder="ชื่องาน" />
@@ -689,10 +714,11 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
       ["โครงการ", quote.project || ""],
       [],
       ["ลำดับ", "รายการ / DESCRIPTION", "จำนวน", "หน่วย", "หน่วยละ", "จำนวนเงิน (บาท)"],
-      ...(quote.items || []).map((item, i) => [
-        i + 1, item.name, Number(item.qty), item.unit,
-        Number(item.price), Number(item.qty) * Number(item.price)
-      ]),
+      ...(() => { const nums = getItemNumbers(quote.items); return (quote.items || []).flatMap((item, i) =>
+        item.type === "category"
+          ? [[nums[i], item.name, "", "", "", ""]]
+          : [[nums[i], item.name, Number(item.qty), item.unit, Number(item.price), Number(item.qty) * Number(item.price)]]
+      ); })(),
       ["", "( " + ThaiBaht(quote.grandTotal) + " )", "", "", "รวมค่าแรง/วัสดุ", Number(quote.subtotal || 0)],
       ...(quote.overhead > 0 ? [["", "", "", "", `Overhead (${quote.overheadPct}%)`, Number(quote.overhead)]] : []),
       ...(quote.discountAmt > 0 ? [["", "", "", "", "ส่วนลด", -Number(quote.discountAmt)]] : []),
@@ -758,16 +784,18 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
   // สร้าง PDF Blob (ใช้ร่วมกันทั้ง Download และ Open)
   async function buildPdfBlob() {
 
-    const items = (quote.items || []).map((item, i) =>
-      `<tr>
-        <td style="text-align:center;border:1px solid #000;padding:6px;font-size:11px">${i+1}</td>
+    const items = (() => { const nums = getItemNumbers(quote.items); return (quote.items || []).map((item, i) =>
+      item.type === "category"
+        ? `<tr style="background:#f2f2f2"><td style="border:1px solid #000;padding:6px;font-size:11px;font-weight:700;text-align:center">${nums[i]}</td><td style="border:1px solid #000;padding:6px;font-size:11px;font-weight:700" colspan="5">${item.name}</td></tr>`
+        : `<tr>
+        <td style="text-align:center;border:1px solid #000;padding:6px;font-size:11px">${nums[i]}</td>
         <td style="border:1px solid #000;padding:6px;font-size:11px">${item.name}</td>
         <td style="text-align:center;border:1px solid #000;padding:6px;font-size:11px">${item.qty}</td>
         <td style="text-align:center;border:1px solid #000;padding:6px;font-size:11px">${item.unit}</td>
         <td style="text-align:right;border:1px solid #000;padding:6px;font-size:11px">${formatMoney(item.price)}</td>
         <td style="text-align:right;border:1px solid #000;padding:6px;font-size:11px;font-weight:600">${formatMoney(Number(item.qty)*Number(item.price))}</td>
       </tr>`
-    ).join("");
+    ).join(""); })();
 
     const logoHtml = quote.logo
       ? `<img src="${quote.logo}" style="height:60px;object-fit:contain" crossorigin="anonymous">`
@@ -984,17 +1012,23 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
 
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 12, color: "#555", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>รายการงาน</div>
-          {(quote.items || []).map((item, i) => (
-            <div key={item.id || i} style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 8, padding: "10px 12px", marginBottom: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1, marginRight: 8 }}>
-                  <div style={{ fontSize: 12, color: "#ddd" }}>{i + 1}. {item.name}</div>
-                  <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{item.qty} {item.unit} × ฿{formatMoney(item.price)}</div>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#c8a96e", whiteSpace: "nowrap" }}>฿{formatMoney(Number(item.qty) * Number(item.price))}</div>
+          {(() => { const nums = getItemNumbers(quote.items); return (quote.items || []).map((item, i) => (
+            item.type === "category" ? (
+              <div key={item.id || i} style={{ background: "#1a1a1a", border: "1px solid #c8a96e", borderRadius: 8, padding: "8px 12px", marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#c8a96e" }}>{nums[i]} {item.name}</div>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div key={item.id || i} style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 8, padding: "10px 12px", marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, marginRight: 8 }}>
+                    <div style={{ fontSize: 12, color: "#ddd" }}>{nums[i]}. {item.name}</div>
+                    <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{item.qty} {item.unit} × ฿{formatMoney(item.price)}</div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#c8a96e", whiteSpace: "nowrap" }}>฿{formatMoney(Number(item.qty) * Number(item.price))}</div>
+                </div>
+              </div>
+            )
+          )); })()}
         </div>
 
         <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 12, padding: 14, marginBottom: 16 }}>
