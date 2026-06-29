@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a0a; color: #e0e0e0; font-family: monospace; padding: 16px; font-size: 13px; }
+h2 { color: #c8a96e; margin-bottom: 14px; font-size: 15px; }
+.section { background: #111; border: 1px solid #222; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+.label { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+input { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 7px 10px; color: #e0e0e0; font-family: monospace; font-size: 11px; flex: 1; min-width: 180px; }
+button { padding: 8px 16px; border-radius: 6px; border: 1px solid #5af5a0; cursor: pointer; font-weight: 700; font-size: 12px; white-space: nowrap; background: #1a2e1a; color: #5af5a0; margin-right: 6px; }
+.result { margin-top: 8px; padding: 10px; border-radius: 6px; font-size: 11px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+.ok { background: #0a2a0a; border: 1px solid #5af5a0; color: #5af5a0; }
+.fail { background: #2a0a0a; border: 1px solid #f55a5a; color: #f55a5a; }
+.pending { background: #1a1a0a; border: 1px solid #c8a96e; color: #c8a96e; }
+</style>
+</head>
+<body>
+<h2>🔑 ทดสอบ API Key — localhost only</h2>
+
+<div class="section">
+  <div class="label" style="color:#5ab4f5">🔵 Gemini — ดู models ที่ใช้ได้จริง</div>
+  <div class="row">
+    <input id="gm-key" placeholder="AIzaSy..." />
+    <button onclick="listGeminiModels()">📋 ดู Models</button>
+    <button onclick="testGemini()">🔍 ทดสอบ model ด้านล่าง</button>
+  </div>
+  <div class="row">
+    <input id="gm-model" value="gemini-1.5-flash" placeholder="ชื่อ model" />
+  </div>
+  <div id="gm-result"></div>
+</div>
+
+<div class="section">
+  <div class="label" style="color:#9af55a">⚡ OpenRouter</div>
+  <div class="row">
+    <input id="or-key" placeholder="sk-or-v1-..." />
+    <input id="or-model" value="google/gemini-2.0-flash-lite-001" placeholder="model" />
+    <button onclick="testOR()">🔍 ทดสอบ</button>
+  </div>
+  <div id="or-result"></div>
+</div>
+
+<div class="section">
+  <div class="label" style="color:#f5a05a">🟠 Anthropic Direct</div>
+  <div class="row">
+    <input id="an-key" placeholder="sk-ant-... หรือ sk-proj-..." />
+    <button onclick="testAnthropic()">🔍 ทดสอบ</button>
+  </div>
+  <div id="an-result"></div>
+</div>
+
+<script>
+function show(id, msg, type) {
+  document.getElementById(id).innerHTML = `<div class="result ${type}">${msg}</div>`;
+}
+
+async function listGeminiModels() {
+  const key = document.getElementById('gm-key').value.trim();
+  if (!key) return show('gm-result','ใส่ key ก่อน','fail');
+  show('gm-result','⏳ กำลังดึง model list...','pending');
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    const data = await r.json();
+    if (r.ok) {
+      const models = data.models || [];
+      const chat = models.filter(m => m.supportedGenerationMethods?.includes('generateContent'));
+      const names = chat.map(m => m.name.replace('models/','')).join('\n');
+      show('gm-result', '✅ Models ที่ใช้ generateContent ได้:\n' + names, 'ok');
+    } else {
+      show('gm-result', '❌ HTTP '+r.status+'\n'+JSON.stringify(data,null,2), 'fail');
+    }
+  } catch(e) { show('gm-result','❌ '+e.message,'fail'); }
+}
+
+async function testGemini() {
+  const key = document.getElementById('gm-key').value.trim();
+  const model = document.getElementById('gm-model').value.trim();
+  if (!key) return show('gm-result','ใส่ key ก่อน','fail');
+  show('gm-result','⏳ ทดสอบ '+model+'...','pending');
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:10}})});
+    const data = await r.json();
+    if (r.ok) show('gm-result','✅ HTTP '+r.status+' model='+model+'\nReply: '+(data.candidates?.[0]?.content?.parts?.[0]?.text||'-'),'ok');
+    else show('gm-result','❌ HTTP '+r.status+'\n'+JSON.stringify(data,null,2),'fail');
+  } catch(e) { show('gm-result','❌ '+e.message,'fail'); }
+}
+
+async function testOR() {
+  const key = document.getElementById('or-key').value.trim();
+  const model = document.getElementById('or-model').value.trim();
+  if (!key) return show('or-result','ใส่ key ก่อน','fail');
+  show('or-result','⏳ กำลังทดสอบ...','pending');
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':'https://thiengtham.app','X-Title':'TheingTham'},
+      body: JSON.stringify({model, max_tokens:10, messages:[{role:'user',content:'hi'}]})
+    });
+    const data = await r.json();
+    if (r.ok) show('or-result','✅ HTTP '+r.status+'\nModel: '+model+'\nReply: '+(data.choices?.[0]?.message?.content||'-'),'ok');
+    else show('or-result','❌ HTTP '+r.status+'\n'+JSON.stringify(data,null,2),'fail');
+  } catch(e) { show('or-result','❌ '+e.message,'fail'); }
+}
+
+async function testAnthropic() {
+  const key = document.getElementById('an-key').value.trim();
+  if (!key) return show('an-result','ใส่ key ก่อน','fail');
+  show('an-result','⏳ กำลังทดสอบ...','pending');
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'hi'}]})
+    });
+    const data = await r.json();
+    if (r.ok) show('an-result','✅ HTTP '+r.status+'\nReply: '+(data.content?.[0]?.text||'-'),'ok');
+    else show('an-result','❌ HTTP '+r.status+'\n'+JSON.stringify(data,null,2),'fail');
+  } catch(e) { show('an-result','❌ '+e.message,'fail'); }
+}
+</script>
+</body>
+</html>

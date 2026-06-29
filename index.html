@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>เที่ยงทำ ใบเสนอราคา</title>
+    <style>
+      /* ป้องกันหน้าขาว — ตั้งสีพื้นหลังก่อน JS โหลด */
+      html, body, #root {
+        margin: 0; padding: 0;
+        background: #0a0a0a !important;
+        color: #e8e8e8;
+        width: 100%;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      /* fallback font ไม่ง้อ Google Fonts */
+      body {
+        font-family: 'Noto Sans Thai', 'Sarabun', 'Prompt', 
+                     -apple-system, BlinkMacSystemFont, 
+                     'Segoe UI', sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

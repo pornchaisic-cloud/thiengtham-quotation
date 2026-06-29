@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ThiengTham</string>
+    <string name="title_activity_main">ThiengTham</string>
+    <string name="package_name">com.thiengtham.app</string>
+    <string name="custom_url_scheme">com.thiengtham.app</string>
+</resources>
