@@ -11,3 +11,4 @@ android/local.properties
 dist/
 .cache/
 .idea/
+.env
