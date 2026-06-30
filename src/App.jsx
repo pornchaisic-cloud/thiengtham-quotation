@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
@@ -156,8 +155,6 @@ function ThaiBaht(Number) {
 
 
 export default function App() {
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
-
   const [screen, setScreen] = useState(SCREENS.HOME);
   const [quotes, setQuotes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("tt_quotes") || "[]"); } catch { return []; }
@@ -1397,7 +1394,7 @@ function AIAnalyzeScreen({ navTo, priceDb, setPriceDb, saveQuote, showToast }) {
       
       for (let m = 0; m < orModels.length; m++) {
         const modelName = orModels[m];
-        setProgress(`🤖 Claude (OpenRouter) กำลังวิเคราะห์... [${modelName}]`);
+        setProgress(`🤖 Gemini/Llama (OpenRouter) กำลังวิเคราะห์... [${modelName}]`);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 45000);
         try {
@@ -1450,7 +1447,7 @@ function AIAnalyzeScreen({ navTo, priceDb, setPriceDb, saveQuote, showToast }) {
 
   const systemPromptBase = `ผู้ช่วยออกใบเสนอราคาก่อสร้าง ตอบ JSON เท่านั้น ห้ามมีข้อความอื่น
 ราคางาน(ชื่อ|หน่วย|ราคา): ${priceDbCompact}
-JSON format: {"customerName":"","address":"","project":"","items":[{"name":"","qty":1,"unit":"","price":0}],"remarks":"","newPriceItems":[{"name":"","unit":"","price":0}]}
+JSON format: {"customerName":"","address":"","project":"","items":[{"name":"","qty":1,"unit":"","price":0}],"remarks":"","overheadPct":0,"discount":0,"paymentTerms":"","newPriceItems":[{"name":"","unit":"","price":0}]}
 newPriceItems=รายการใหม่ที่ไม่มีในฐานข้อมูล ใช้ราคาประมาณ`;
 
   async function analyze() {
@@ -1472,7 +1469,7 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
       } else if (apiProvider === "openrouter") {
         const orKeys = getOpenRouterKeys();
         if (orKeys.length === 0) throw new Error("❌ ยังไม่มี OpenRouter API Key — กรุณาเพิ่มใน 🔑 จัดการ API Keys ก่อนวิเคราะห์");
-        setProgress("🤖 Claude (OpenRouter) กำลังวิเคราะห์...");
+        setProgress("🤖 Gemini/Llama (OpenRouter) กำลังวิเคราะห์...");
         textResult = await callOpenRouterAPI(systemPromptBase, input || "วิเคราะห์จากรูปที่แนบ", imageAtts);
 
       } else {
@@ -1609,12 +1606,16 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
       phone: "", project: result.project || "", date: today(),
       items: (result.items || []).map(i => ({ ...i, id: genId() })),
       remarks: result.remarks || "*งานนอกเหนือจากงานนี้เป็นงานเพิ่มเติมได้",
-      includeVat: true, discount: 0, overheadPct: 0, paymentTerms: "",
+      includeVat: true, discount: Number(result.discount) || 0, overheadPct: Number(result.overheadPct) || 0, paymentTerms: result.paymentTerms || "",
       attachments: attachments.map(a => ({ id: a.id, name: a.name, data: a.data, isImage: a.isImage, mediaType: a.mediaType })),
     };
     const subtotal = q.items.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0);
-    const vat = subtotal * 0.07;
-    q.subtotal = subtotal; q.vat = vat; q.grandTotal = subtotal + vat; q.overhead = 0; q.discountAmt = 0;
+    const overhead = subtotal * (Number(q.overheadPct) / 100);
+    const afterOverhead = subtotal + overhead;
+    const discountAmt = Number(q.discount) || 0;
+    const vat = includeVat ? (afterOverhead - discountAmt) * 0.07 : 0;
+    const grandTotal = (afterOverhead - discountAmt) + vat;
+    q.subtotal = subtotal; q.overhead = overhead; q.afterOverhead = afterOverhead; q.discountAmt = discountAmt; q.vat = vat; q.grandTotal = grandTotal;
     saveQuote(q);
     showToast("สร้างใบเสนอราคาสำเร็จ");
     navTo(SCREENS.VIEW_QUOTE, q);
@@ -1631,7 +1632,7 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {[
               { id: "gemini", label: "🔵 Google Gemini", sub: "แนะนำ / ฟรี / ใส่ Key เอง" },
-              { id: "openrouter", label: "⚡ Claude (OpenRouter)", sub: "ใส่ Key เอง" },
+              { id: "openrouter", label: "⚡ Gemini/Llama (OpenRouter)", sub: "ใส่ Key เอง" },
               { id: "anthropic", label: "🟠 Claude (Direct)", sub: "ใส่ Key เอง" },
             ].map(p => (
               <button key={p.id} onClick={() => {
@@ -1732,7 +1733,7 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
               {/* OpenRouter Keys */}
               <KeySection
                 color="#9af55a"
-                title="⚡ OpenRouter API Key (Claude)"
+                title="⚡ OpenRouter API Key (Gemini/Llama)"
                 hint="รับที่ openrouter.ai"
                 placeholder="sk-or-v1-..."
                 storageKey="tt_openrouter_keys"
@@ -2062,5 +2063,3 @@ function btnSm(color, outline = false) {
   };
 }
 
-
-/* PDF Preview Panel ready: render iframe using pdfPreviewUrl state */
