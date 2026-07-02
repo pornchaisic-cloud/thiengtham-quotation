@@ -101,7 +101,7 @@ const INITIAL_PRICE_DB = [
   { id: 21, name: "งานแก้ไขฝ้าเพดาน (เฉพาะจุด)", unit: "งาน", price: 4850 },
 ];
 
-const SCREENS = { HOME: "home", NEW_QUOTE: "new_quote", QUOTES: "quotes", VIEW_QUOTE: "view_quote", PRICE_DB: "price_db", AI_ANALYZE: "ai_analyze" };
+const SCREENS = { HOME: "home", NEW_QUOTE: "new_quote", QUOTES: "quotes", VIEW_QUOTE: "view_quote", PRICE_DB: "price_db", AI_ANALYZE: "ai_analyze", TRANSFER: "transfer" };
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function formatMoney(n) { return Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -190,8 +190,25 @@ export default function App() {
   const [activeQuote, setActiveQuote] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const [online, setOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(() => sync.getPendingCount());
+
   useEffect(() => { localStorage.setItem("tt_quotes", JSON.stringify(quotes)); }, [quotes]);
   useEffect(() => { localStorage.setItem("tt_pricedb_meta", JSON.stringify(priceDbMeta)); }, [priceDbMeta]);
+
+  useEffect(() => {
+    const goOnline = () => {
+      setOnline(true);
+      sync.replayPending().then(() => setPendingCount(sync.getPendingCount()));
+    };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -237,6 +254,12 @@ export default function App() {
     const qWithTime = { ...q, updatedAt: now };
     let prev = null;
     setQuotes(p => { prev = p; const idx = p.findIndex(x => x.id === q.id); if (idx >= 0) { const n = [...p]; n[idx] = qWithTime; return n; } return [qWithTime, ...p]; });
+    if (!online) {
+      sync.addToPending("upsertQuote", qWithTime);
+      setPendingCount(sync.getPendingCount());
+      showToast("📡 ออฟไลน์ — จะซิงค์เมื่อเชื่อมต่อ", "info");
+      return;
+    }
     try { await sync.upsertQuote(qWithTime); } catch (e) {
       console.error("save to cloud failed", e);
       if (prev) setQuotes(prev);
@@ -247,6 +270,13 @@ export default function App() {
   async function deleteQuote(id) {
     let prev = null;
     setQuotes(p => { prev = p; return p.filter(x => x.id !== id); });
+    if (!online) {
+      sync.addToPending("deleteQuote", id);
+      setPendingCount(sync.getPendingCount());
+      showToast("📡 ออฟไลน์ — จะซิงค์เมื่อเชื่อมต่อ", "info");
+      setScreen(SCREENS.QUOTES);
+      return;
+    }
     try { await sync.deleteQuote(id); showToast("ลบใบเสนอราคาแล้ว", "danger"); setScreen(SCREENS.QUOTES); } catch (e) {
       console.error("delete from cloud failed", e);
       if (prev) setQuotes(prev);
@@ -255,13 +285,22 @@ export default function App() {
   }
 
   function handleSetPriceDb(updater) {
-    setPriceDbMeta(prev => {
-      const newData = typeof updater === 'function' ? updater(prev.data) : updater;
-      const now = new Date().toISOString();
-      sync.upsertPriceDb({ data: newData, updatedAt: now }).catch(e => {
-        console.error("priceDb sync fail", e);
-      });
-      return { updatedAt: now, data: newData };
+    let prevSnapshot = null;
+    let newData = null;
+    setPriceDbMeta(p => {
+      prevSnapshot = p;
+      newData = typeof updater === 'function' ? updater(p.data) : updater;
+      return { updatedAt: new Date().toISOString(), data: newData };
+    });
+    if (!online) {
+      sync.addToPending("upsertPriceDb", { data: newData, updatedAt: new Date().toISOString() });
+      setPendingCount(sync.getPendingCount());
+      return;
+    }
+    sync.upsertPriceDb({ data: newData, updatedAt: new Date().toISOString() }).catch(e => {
+      console.error("priceDb sync fail", e);
+      if (prevSnapshot) setPriceDbMeta(prevSnapshot);
+      showToast("บันทึกฐานข้อมูลราคาไม่สำเร็จ", "danger");
     });
   }
 
@@ -271,12 +310,28 @@ export default function App() {
     // FIX: เต็มหน้าจอ ไม่จำกัด maxWidth
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#e8e8e8", fontFamily: "'Noto Sans Thai', 'Sarabun', sans-serif", width: "100%", maxWidth: "100%", position: "relative", overflowX: "hidden" }}>
       {toast && <Toast msg={toast.msg} type={toast.type} />}
+      <ConnectionBanner online={online} pendingCount={pendingCount} />
       {screen === SCREENS.HOME && <HomeScreen navTo={navTo} quotes={quotes} />}
       {screen === SCREENS.QUOTES && <QuoteListScreen quotes={quotes} navTo={navTo} deleteQuote={deleteQuote} />}
       {screen === SCREENS.NEW_QUOTE && <QuoteFormScreen navTo={navTo} priceDb={priceDb} saveQuote={saveQuote} quote={activeQuote} showToast={showToast} quotes={quotes} />}
       {screen === SCREENS.VIEW_QUOTE && activeQuote && <ViewQuoteScreen quote={activeQuote} navTo={navTo} deleteQuote={deleteQuote} showToast={showToast} />}
       {screen === SCREENS.PRICE_DB && <PriceDbScreen priceDb={priceDb} setPriceDb={handleSetPriceDb} showToast={showToast} navTo={navTo} />}
       {screen === SCREENS.AI_ANALYZE && <AIAnalyzeScreen navTo={navTo} priceDb={priceDb} setPriceDb={handleSetPriceDb} saveQuote={saveQuote} showToast={showToast} />}
+      {screen === SCREENS.TRANSFER && <TransferScreen navTo={navTo} showToast={showToast} quotes={quotes} setQuotes={setQuotes} priceDbMeta={priceDbMeta} setPriceDbMeta={setPriceDbMeta} />}
+    </div>
+  );
+}
+
+function ConnectionBanner({ online, pendingCount }) {
+  if (online && pendingCount === 0) return null;
+  const color = online ? "#1a3a5c" : "#5c3a1a";
+  const icon = online ? "🔄" : "🟡";
+  const text = online
+    ? `ซิงค์ ${pendingCount} รายการ...`
+    : `ออฟไลน์ — ทำงานปกติ จะซิงค์เมื่อเชื่อมต่อ`;
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 100, background: color, color: "#e8e8e8", padding: "6px 16px", fontSize: 12, textAlign: "center", fontWeight: 600 }}>
+      {icon} {text}
     </div>
   );
 }
@@ -400,6 +455,10 @@ function HomeScreen({ navTo, quotes }) {
           <MenuBtn icon="📂" label="ใบเสนอราคา" sub={stats.total + " รายการ"} color="#a06af5" onClick={() => navTo(SCREENS.QUOTES)} />
           <MenuBtn icon="💰" label="ฐานข้อมูลราคา" sub="จัดการราคางาน" color="#5af5a0" onClick={() => navTo(SCREENS.PRICE_DB)} />
         </div>
+
+        <button onClick={() => navTo(SCREENS.TRANSFER)} style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #2a2a2a", borderRadius: 10, color: "#888", fontSize: 12, cursor: "pointer", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          📡 ย้ายข้อมูลไปเครื่องใหม่
+        </button>
 
         {quotes.length > 0 && (
           <div style={{ marginTop: 24 }}>
@@ -1868,6 +1927,157 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
             <button onClick={createQuoteFromResult} style={{ width: "100%", padding: 12, background: "#5af5a0", border: "none", borderRadius: 10, color: "#000", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 12 }}>
               📋 สร้างเอกสารใบเสนอราคา
             </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TransferScreen({ navTo, showToast, quotes, setQuotes, priceDbMeta, setPriceDbMeta }) {
+  const [tab, setTab] = useState("send");
+  const [loading, setLoading] = useState(false);
+  const [code, setCode] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [expiresAt, setExpiresAt] = useState(null);
+  const [inputCode, setInputCode] = useState("");
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const id = setInterval(() => {
+      if (Date.now() > expiresAt.getTime()) {
+        setGeneratedCode("");
+        setExpiresAt(null);
+        showToast("โค้ดหมดอายุแล้ว — กรุณาสร้างใหม่", "danger");
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt, showToast]);
+
+  async function handleGenerate() {
+    setLoading(true);
+    setGeneratedCode("");
+    setExpiresAt(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("ยังไม่ได้ login");
+      const { data: newCode, error } = await supabase.rpc("generate_transfer_code", { p_source_user_id: user.id });
+      if (error) throw error;
+      setGeneratedCode(newCode);
+      setExpiresAt(new Date(Date.now() + 15 * 60 * 1000));
+    } catch (e) {
+      showToast("สร้างโค้ดไม่สำเร็จ: " + e.message, "danger");
+    }
+    setLoading(false);
+  }
+
+  async function handleReceive() {
+    const c = inputCode.trim().toUpperCase();
+    if (!c || c.length !== 6) { showToast("กรุณากรอกโค้ด 6 หลัก", "danger"); return; }
+    setLoading(true);
+    setResult(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("ยังไม่ได้ login");
+      const { data: ok, error } = await supabase.rpc("transfer_data", { p_code: c, p_dest_user_id: user.id });
+      if (error) throw error;
+      setResult("success");
+      showToast("✅ ย้ายข้อมูลสำเร็จ กำลังโหลดข้อมูล...", "success");
+      const cloud = await sync.pullAll();
+      if (cloud.quotes?.length > 0) {
+        setQuotes(prev => {
+          const map = new Map(prev.map(q => [q.id, q]));
+          let changed = false;
+          for (const cq of cloud.quotes) {
+            const local = map.get(cq.id);
+            if (!local || (cq._updatedAt || '') > (local.updatedAt || '')) {
+              map.set(cq.id, cq);
+              changed = true;
+            }
+          }
+          return changed ? [...map.values()] : prev;
+        });
+      }
+      if (cloud.priceDb) {
+        setPriceDbMeta(prev => {
+          const ct = cloud.priceDb._updatedAt || '';
+          if (ct > (prev.updatedAt || '')) return { updatedAt: ct, data: cloud.priceDb.data };
+          return prev;
+        });
+      }
+    } catch (e) {
+      const msg = e.message || "";
+      if (msg.includes("TRANSFER_CODE_INVALID")) showToast("❌ โค้ดไม่ถูกต้องหรือหมดอายุแล้ว", "danger");
+      else showToast("❌ รับข้อมูลไม่สำเร็จ: " + msg, "danger");
+      setResult("error");
+    }
+    setLoading(false);
+  }
+
+  const expiresSeconds = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)) : 0;
+
+  return (
+    <div style={{ minHeight: "100vh", paddingBottom: 80 }}>
+      <Header title="ย้ายข้อมูลไปเครื่องใหม่" onBack={() => navTo(SCREENS.HOME)} />
+      <div style={{ padding: "16px" }}>
+        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #1a1a1a", background: "#0d0d0d", marginBottom: 16 }}>
+          {[["send", "ส่งข้อมูล"], ["receive", "รับข้อมูล"]].map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)} style={{
+              flex: 1, padding: "12px 0", background: "none", border: "none",
+              color: tab === k ? "#c8a96e" : "#555", fontSize: 13, fontWeight: tab === k ? 600 : 400,
+              borderBottom: tab === k ? "2px solid #c8a96e" : "2px solid transparent", cursor: "pointer"
+            }}>{l}</button>
+          ))}
+        </div>
+
+        {tab === "send" ? (
+          <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 12, padding: 20, textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "#888", marginBottom: 16, lineHeight: 1.6 }}>
+              สร้างโค้ด 6 หลักเพื่อย้ายข้อมูลไปเครื่องใหม่<br />
+              <span style={{ fontSize: 12, color: "#555" }}>โค้ดหมดอายุใน 15 นาที</span>
+            </div>
+
+            {!generatedCode ? (
+              <button onClick={handleGenerate} disabled={loading}
+                style={{ padding: "14px 32px", background: loading ? "#222" : "#c8a96e", border: "none", borderRadius: 10, color: loading ? "#666" : "#000", fontWeight: 700, fontSize: 15, cursor: loading ? "not-allowed" : "pointer" }}>
+                {loading ? "⏳ กำลังสร้าง..." : "🔑 สร้างโค้ด"}
+              </button>
+            ) : (
+              <div>
+                <div style={{ fontSize: 48, fontWeight: 700, color: "#c8a96e", letterSpacing: 8, fontFamily: "monospace", marginBottom: 8 }}>
+                  {generatedCode}
+                </div>
+                <div style={{ fontSize: 13, color: expiresSeconds < 60 ? "#f55a5a" : "#888" }}>
+                  ⏱ หมดอายุใน {Math.floor(expiresSeconds / 60)}:{String(expiresSeconds % 60).padStart(2, "0")} น.
+                </div>
+                <div style={{ fontSize: 12, color: "#555", marginTop: 16, lineHeight: 1.6, background: "#0d0d0d", padding: 12, borderRadius: 8 }}>
+                  ใส่โค้ดนี้ในเครื่องใหม่ → "รับข้อมูล"
+                </div>
+                <button onClick={handleGenerate} style={{ marginTop: 12, padding: "8px 20px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 8, color: "#aaa", fontSize: 12, cursor: "pointer" }}>
+                  🔄 สร้างใหม่
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 14, color: "#888", marginBottom: 16, lineHeight: 1.6 }}>
+              ใส่โค้ด 6 หลักจากเครื่องเก่าเพื่อรับข้อมูล
+            </div>
+            <input value={inputCode} onChange={e => setInputCode(e.target.value.toUpperCase().slice(0, 6))}
+              placeholder="เช่น A1B2C3"
+              style={{ ...inputStyle, textAlign: "center", fontSize: 24, fontFamily: "monospace", letterSpacing: 6, textTransform: "uppercase" }}
+              maxLength={6} />
+            <button onClick={handleReceive} disabled={loading || inputCode.length !== 6}
+              style={{ width: "100%", padding: 14, background: loading ? "#222" : "#c8a96e", border: "none", borderRadius: 10, color: loading ? "#666" : "#000", fontWeight: 700, fontSize: 15, cursor: (loading || inputCode.length !== 6) ? "not-allowed" : "pointer", marginTop: 16 }}>
+              {loading ? "⏳ กำลังรับข้อมูล..." : "📥 รับข้อมูล"}
+            </button>
+            {result === "success" && (
+              <div style={{ marginTop: 12, textAlign: "center", color: "#5af5a0", fontSize: 14, fontWeight: 600 }}>
+                ✅ ย้ายข้อมูลสำเร็จ!
+              </div>
+            )}
           </div>
         )}
       </div>

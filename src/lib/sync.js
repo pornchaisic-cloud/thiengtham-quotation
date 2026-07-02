@@ -48,6 +48,41 @@ export async function upsertPriceDb(meta) {
   if (error) throw error;
 }
 
+// ---- Offline pending queue ----
+const PENDING_KEY = "tt_pending_sync";
+
+export function getPendingCount() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]").length; } catch { return 0; }
+}
+
+export function addToPending(action, payload) {
+  const queue = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+  queue.push({ action, payload, ts: new Date().toISOString() });
+  localStorage.setItem(PENDING_KEY, JSON.stringify(queue));
+}
+
+export async function replayPending() {
+  const queue = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+  if (queue.length === 0) return;
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      if (item.action === "upsertQuote") await upsertQuote(item.payload);
+      else if (item.action === "deleteQuote") await deleteQuote(item.payload);
+      else if (item.action === "upsertPriceDb") await upsertPriceDb(item.payload);
+      else remaining.push(item);
+    } catch (e) {
+      console.warn("replay failed for", item.action, e);
+      remaining.push(item);
+    }
+  }
+  localStorage.setItem(PENDING_KEY, JSON.stringify(remaining));
+}
+
+export function clearPending() {
+  localStorage.removeItem(PENDING_KEY);
+}
+
 export async function pullAll() {
   const { data: quotesData, error: quotesError } = await supabase
     .from("quotes")
