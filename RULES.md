@@ -9,3 +9,12 @@
 7. **ใช้ภาษาไทยในการสื่อสาร**
 8. **ใช้ Playwright สำหรับ browser automation** (สร้าง GitHub/Supabase)
 9. **ทำงานให้เร็ว** (ที่บอกล่าสุด)
+
+---
+
+**Checkpoint ล่าสุด:**
+- checkpoint 5 (3796274) — Phase 2: sync layer + priceDbMeta merge + deploy assets
+  - `src/lib/sync.js` (new) — getOrCreateDevice, upsertQuote, deleteQuote, upsertPriceDb, pullAll
+  - `src/App.jsx` — priceDbMeta state, merge logic (last-write-wins), saveQuote timestamp, handleSetPriceDb wrapper
+  - `update_PLAN.md` แทน `FIX_PLAN.md`
+  - APK rebuilt, logo cleanup
