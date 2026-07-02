@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { supabase, BUCKET_NAME } from "./lib/supabase";
+import * as sync from "./lib/sync";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -25,28 +26,43 @@ function blobToBase64(blob) {
   });
 }
 
-// Helper สำหรับ Native: บันทึกไฟล์และเรียกเมนูแชร์ (เพื่อให้เลือก Save to Files หรือเปิดแอปอื่น)
-async function saveAndShareNative(blob, fileName, showToast) {
+// Helper สำหรับ Native: บันทึกไฟล์ลง Documents โดยตรง (ใช้กับปุ่ม "ดาวน์โหลด")
+async function saveFileToDevice(blob, fileName, showToast) {
   try {
     const base64 = await blobToBase64(blob);
+    // ลองเขียนที่ Documents ก่อน (Android 11+ อาจไปที่ app-private)
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: base64,
+      directory: Directory.Documents,
+    });
+    showToast("💾 บันทึกไฟล์สำเร็จ: " + fileName);
+    return true;
+  } catch (e) {
+    console.error("Save to Documents failed, trying Share fallback:", e);
+    // Fallback: ใช้ Share dialog ให้ผู้ใช้เลือก "บันทึกไปยังไฟล์" เอง
+    await shareFileNative(blob, fileName, showToast);
+    return true;
+  }
+}
 
-    // 1. บันทึกลงเครื่อง (Cache)
+// Helper สำหรับ Native: เรียกเมนูแชร์ (ใช้กับปุ่ม "เปิด")
+async function shareFileNative(blob, fileName, showToast) {
+  try {
+    const base64 = await blobToBase64(blob);
     const savedFile = await Filesystem.writeFile({
       path: fileName,
       data: base64,
       directory: Directory.Cache,
     });
-
-    // 2. เรียกหน้าต่างแชร์ทันที (เพื่อให้เลือก "Save to Files" หรือ "บันทึกลงไฟล์")
     await Share.share({
       title: fileName,
       url: savedFile.uri,
     });
-
     return true;
   } catch (e) {
-    console.error("Save/Share error:", e);
-    showToast("❌ ไม่สามารถดำเนินการได้: " + e.message, "danger");
+    console.error("Share error:", e);
+    showToast("❌ ไม่สามารถแชร์ไฟล์ได้: " + e.message, "danger");
     throw e;
   }
 }
@@ -59,7 +75,7 @@ const COMPANY_INFO = {
   taxId: "1729900000000",
 };
 
-const COMPANY_LOGO = "https://lh3.googleusercontent.com/d/1ADCx2vlUxgagYSz1NlbsfpjSeI5PIMuz";
+const COMPANY_LOGO = "/logo.png";
 
 const INITIAL_PRICE_DB = [
   { id: 1, name: "แก้ไขผนังแตกร้าว ขูดรอยร้าวและเซาะร่อง V อุดรอยร้าวด้วย non-shrink", unit: "งาน", price: 4650 },
@@ -159,32 +175,94 @@ export default function App() {
   const [quotes, setQuotes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("tt_quotes") || "[]"); } catch { return []; }
   });
-  const [priceDb, setPriceDb] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("tt_pricedb") || JSON.stringify(INITIAL_PRICE_DB)); } catch { return INITIAL_PRICE_DB; }
+  const [priceDbMeta, setPriceDbMeta] = useState(() => {
+    const raw = localStorage.getItem("tt_pricedb_meta");
+    if (raw) return JSON.parse(raw);
+    const legacy = localStorage.getItem("tt_pricedb");
+    if (legacy) {
+      const data = JSON.parse(legacy);
+      localStorage.removeItem("tt_pricedb");
+      return { updatedAt: "", data };
+    }
+    return { updatedAt: "", data: INITIAL_PRICE_DB };
   });
+  const priceDb = priceDbMeta.data;
   const [activeQuote, setActiveQuote] = useState(null);
   const [toast, setToast] = useState(null);
 
   useEffect(() => { localStorage.setItem("tt_quotes", JSON.stringify(quotes)); }, [quotes]);
-  useEffect(() => { localStorage.setItem("tt_pricedb", JSON.stringify(priceDb)); }, [priceDb]);
+  useEffect(() => { localStorage.setItem("tt_pricedb_meta", JSON.stringify(priceDbMeta)); }, [priceDbMeta]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await sync.getOrCreateDevice();
+        const cloud = await sync.pullAll();
+        if (cloud.quotes?.length > 0) {
+          setQuotes(prev => {
+            const map = new Map(prev.map(q => [q.id, q]));
+            let changed = false;
+            for (const cq of cloud.quotes) {
+              const local = map.get(cq.id);
+              if (!local || (cq._updatedAt || '') > (local.updatedAt || '')) {
+                map.set(cq.id, cq);
+                changed = true;
+              }
+            }
+            return changed ? [...map.values()] : prev;
+          });
+        }
+        if (cloud.priceDb) {
+          setPriceDbMeta(prev => {
+            const ct = cloud.priceDb._updatedAt || '';
+            if (ct > (prev.updatedAt || '')) {
+              return { updatedAt: ct, data: cloud.priceDb.data };
+            }
+            return prev;
+          });
+        }
+      } catch (e) {
+        console.warn("cloud sync failed, using local data", e);
+      }
+    })();
+  }, []);
 
   function showToast(msg, type = "success") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2500);
   }
 
-  function saveQuote(q) {
-    setQuotes(prev => {
-      const idx = prev.findIndex(x => x.id === q.id);
-      if (idx >= 0) { const n = [...prev]; n[idx] = q; return n; }
-      return [q, ...prev];
-    });
+  async function saveQuote(q) {
+    const now = new Date().toISOString();
+    const qWithTime = { ...q, updatedAt: now };
+    let prev = null;
+    setQuotes(p => { prev = p; const idx = p.findIndex(x => x.id === q.id); if (idx >= 0) { const n = [...p]; n[idx] = qWithTime; return n; } return [qWithTime, ...p]; });
+    try { await sync.upsertQuote(qWithTime); } catch (e) {
+      console.error("save to cloud failed", e);
+      if (prev) setQuotes(prev);
+      showToast("บันทึก cloud ไม่สำเร็จ", "danger");
+    }
   }
 
-  function deleteQuote(id) {
-    setQuotes(prev => prev.filter(x => x.id !== id));
-    showToast("ลบใบเสนอราคาแล้ว", "danger");
-    setScreen(SCREENS.QUOTES);
+  async function deleteQuote(id) {
+    let prev = null;
+    setQuotes(p => { prev = p; return p.filter(x => x.id !== id); });
+    try { await sync.deleteQuote(id); showToast("ลบใบเสนอราคาแล้ว", "danger"); setScreen(SCREENS.QUOTES); } catch (e) {
+      console.error("delete from cloud failed", e);
+      if (prev) setQuotes(prev);
+      showToast("ลบ cloud ไม่สำเร็จ", "danger");
+    }
+  }
+
+  function handleSetPriceDb(updater) {
+    setPriceDbMeta(prev => {
+      const newData = typeof updater === 'function' ? updater(prev.data) : updater;
+      const now = new Date().toISOString();
+      sync.upsertPriceDb({ data: newData, updatedAt: now }).catch(e => {
+        console.error("priceDb sync fail", e);
+      });
+      return { updatedAt: now, data: newData };
+    });
   }
 
   const navTo = (s, q = null) => { setActiveQuote(q); setScreen(s); };
@@ -197,8 +275,8 @@ export default function App() {
       {screen === SCREENS.QUOTES && <QuoteListScreen quotes={quotes} navTo={navTo} deleteQuote={deleteQuote} />}
       {screen === SCREENS.NEW_QUOTE && <QuoteFormScreen navTo={navTo} priceDb={priceDb} saveQuote={saveQuote} quote={activeQuote} showToast={showToast} quotes={quotes} />}
       {screen === SCREENS.VIEW_QUOTE && activeQuote && <ViewQuoteScreen quote={activeQuote} navTo={navTo} deleteQuote={deleteQuote} showToast={showToast} />}
-      {screen === SCREENS.PRICE_DB && <PriceDbScreen priceDb={priceDb} setPriceDb={setPriceDb} showToast={showToast} navTo={navTo} />}
-      {screen === SCREENS.AI_ANALYZE && <AIAnalyzeScreen navTo={navTo} priceDb={priceDb} setPriceDb={setPriceDb} saveQuote={saveQuote} showToast={showToast} />}
+      {screen === SCREENS.PRICE_DB && <PriceDbScreen priceDb={priceDb} setPriceDb={handleSetPriceDb} showToast={showToast} navTo={navTo} />}
+      {screen === SCREENS.AI_ANALYZE && <AIAnalyzeScreen navTo={navTo} priceDb={priceDb} setPriceDb={handleSetPriceDb} saveQuote={saveQuote} showToast={showToast} />}
     </div>
   );
 }
@@ -298,7 +376,7 @@ function HomeScreen({ navTo, quotes }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
           <div style={{ width: 60, height: 60, background: "#fff", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "2px solid #c8a96e" }}>
             <img src={currentLogo} alt="logo" style={{ width: "90%", height: "90%", objectFit: "contain" }}
-                 onError={(e) => { e.target.src = "https://via.placeholder.com/60?text=TT"; }} />
+                 onError={(e) => { e.target.src = COMPANY_LOGO; }} />
           </div>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: "#e63030", letterSpacing: 0.5 }}>เที่ยงทำ ดีเวลลอปเม้นท์</div>
@@ -746,7 +824,7 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
       const { blob: excelBlob, filename } = await buildExcelBlob();
 
       if (isNative()) {
-        await saveAndShareNative(excelBlob, filename, showToast);
+        await saveFileToDevice(excelBlob, filename, showToast);
       } else {
         const url = URL.createObjectURL(excelBlob);
         const a = document.createElement("a");
@@ -768,7 +846,7 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
     try {
       const { blob: excelBlob, filename } = await buildExcelBlob();
       if (isNative()) {
-        await saveAndShareNative(excelBlob, filename, showToast);
+        await shareFileNative(excelBlob, filename, showToast);
       } else {
         const url = URL.createObjectURL(excelBlob);
         window.open(url, "_blank");
@@ -939,7 +1017,7 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
       const { blob: pdfBlob, filename } = await buildPdfBlob();
 
       if (isNative()) {
-        await saveAndShareNative(pdfBlob, filename, showToast);
+        await saveFileToDevice(pdfBlob, filename, showToast);
       } else {
         const url = URL.createObjectURL(pdfBlob);
         const a = document.createElement("a");
@@ -961,7 +1039,7 @@ function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
     try {
       const { blob: pdfBlob, filename } = await buildPdfBlob();
       if (isNative()) {
-        await saveAndShareNative(pdfBlob, filename, showToast);
+        await shareFileNative(pdfBlob, filename, showToast);
       } else {
         const url = URL.createObjectURL(pdfBlob);
         window.open(url, "_blank");
@@ -1613,7 +1691,7 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
     const overhead = subtotal * (Number(q.overheadPct) / 100);
     const afterOverhead = subtotal + overhead;
     const discountAmt = Number(q.discount) || 0;
-    const vat = includeVat ? (afterOverhead - discountAmt) * 0.07 : 0;
+    const vat = q.includeVat ? (afterOverhead - discountAmt) * 0.07 : 0;
     const grandTotal = (afterOverhead - discountAmt) + vat;
     q.subtotal = subtotal; q.overhead = overhead; q.afterOverhead = afterOverhead; q.discountAmt = discountAmt; q.vat = vat; q.grandTotal = grandTotal;
     saveQuote(q);
