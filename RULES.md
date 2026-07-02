@@ -13,8 +13,20 @@
 ---
 
 **Checkpoint ล่าสุด:**
-- checkpoint 5 (3796274) — Phase 2: sync layer + priceDbMeta merge + deploy assets
-  - `src/lib/sync.js` (new) — getOrCreateDevice, upsertQuote, deleteQuote, upsertPriceDb, pullAll
-  - `src/App.jsx` — priceDbMeta state, merge logic (last-write-wins), saveQuote timestamp, handleSetPriceDb wrapper
-  - `update_PLAN.md` แทน `FIX_PLAN.md`
-  - APK rebuilt, logo cleanup
+- checkpoint 6 (pending) — Download fix + component splitting + sync error handling
+  - `AndroidManifest.xml` — WRITE_EXTERNAL_STORAGE (maxSdkVersion=32), READ_EXTERNAL_STORAGE, requestLegacyExternalStorage
+  - `src/utils/fileHelper.js` (new) — saveFileToDevice fallback (Documents→External), shareFileNative, blobToBase64
+  - `src/utils/helpers.js` (new) — COMPANY_INFO, SCREENS, formatMoney, thaiDateStr, ThaiBaht, getItemNumbers, genId, INITIAL_PRICE_DB
+  - `src/utils/apiKeys.js` (new) — getUserApiKeys, getAllApiKeys, getAnthropicApiKeys, getOpenRouterKeys
+  - `src/utils/styles.js` (new) — inputStyle, btnSm, btnKey, Label, SumRow
+  - `src/components/Toast.jsx` (new) — toast notification
+  - `src/components/ConnectionBanner.jsx` (new) — offline/syncing/error+retry banner
+  - `src/components/Header.jsx` (new) — shared header
+  - `src/components/KeySection.jsx` (new) — API key management
+  - `src/components/TransferScreen.jsx` (new) — code-based data migration
+  - `src/components/PriceDbScreen.jsx` (new) — price DB CRUD + Excel import
+  - `src/components/ViewQuoteScreen.jsx` (new) — quote view + Excel/PDF
+  - `src/App.jsx` — rewritten from ~2354 → ~928 lines, imports extracted components
+  - `src/App.css` — removed unused Vite boilerplate
+  - sync error: new syncState ("idle"|"syncing"|"error") with red banner + retry button
+  - replayPending wrapped with try/catch
