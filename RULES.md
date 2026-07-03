@@ -13,7 +13,14 @@
 ---
 
 **Checkpoint ล่าสุด:**
-- checkpoint 6 (pending) — Download fix + component splitting + sync error handling
+- checkpoint 7 (pending) — QN 26 layout 100% match (Phase 1-6 ของ PLAN_EXCEL_PDF_MATCH.md)
+  - `src/utils/helpers.js` — `COMPANY_INFO.bank` แก้ space/format ให้ตรงต้นฉบับ QN 26
+  - `src/components/ViewQuoteScreen.jsx` — แก้ เงื่อนไขการชำระเงิน ใน HTML preview (ลบ header, format งวดแบบ Excel, แยกบรรทัด "ช่องทาง/สั่งจ่าย/ธนาคาร") — XLSX export ตรงอยู่แล้ว
+  - `src/App.jsx` — เปลี่ยน default installments จาก 3 งวด (50/30/20) → 2 งวด 50/50 label "ก่อนเริ่มงาน" / "หลังส่งมอบงาน" (ตรงกับ 124/128 ใบใน QN 26)
+  - `scripts/extract_qn26.py`, `find_variations.py`, `group_xlsx_patterns.py`, `verify_match.py` — verify scripts
+  - `PLAN_EXCEL_PDF_MATCH.md` — mark Phase 1-6 เสร็จ + สรุปข้อมูลจริง QN 26
+
+- checkpoint 6 — Download fix + component splitting + sync error handling
   - `AndroidManifest.xml` — WRITE_EXTERNAL_STORAGE (maxSdkVersion=32), READ_EXTERNAL_STORAGE, requestLegacyExternalStorage
   - `src/utils/fileHelper.js` (new) — saveFileToDevice fallback (Documents→External), shareFileNative, blobToBase64
   - `src/utils/helpers.js` (new) — COMPANY_INFO, SCREENS, formatMoney, thaiDateStr, ThaiBaht, getItemNumbers, genId, INITIAL_PRICE_DB

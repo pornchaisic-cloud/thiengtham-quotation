@@ -1,8 +1,10 @@
 export const COMPANY_INFO = {
-  name: "นายพรชัย ชูพรม",
+  name: "บริษัท เที่ยงทำ ดีเวลล็อปเมนท์ จำกัด",
   address: "เลขที่ 10/15 ซ.1/3 หมู่ที่ 6 ถ.รัตนาธิเบศร์ ต.เสาธงหิน อ.บางใหญ่ จ.นนทบุรี 11140",
   phone: "062-069-8888",
   taxId: "1729900000000",
+  bank: "ธ.ไทยพาณิชย์ บัญชี ออมทรัพย์  เลขที่บัญชี 1174057341",
+  subcontractorName: "นายพรชัย ชูพรม",
 };
 
 export const COMPANY_LOGO = "/logo.png";
@@ -98,4 +100,10 @@ export function ThaiBaht(Number) {
     res += "สตางค์";
   }
   return res.replace("หนึ่งสิบ", "สิบ");
+}
+
+// Helper: format Thai baht in parentheses (matching reference Excel format)
+// Reference: (ห้าหกบาทถ้วน) - no spaces between parens and text
+export function thaiBahtText(n) {
+  return "(" + ThaiBaht(n) + ")";
 }

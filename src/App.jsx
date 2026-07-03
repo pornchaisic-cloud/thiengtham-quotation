@@ -385,11 +385,17 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
     setForm(f => ({ ...f, quoteNo: newNo }));
   };
 
-  const [form, setForm] = useState(quote ? { ...quote } : {
+  const getDefaultInstallments = () => [
+    { id: genId(), label: "ก่อนเริ่มงาน", pct: 50, amount: 0 },
+    { id: genId(), label: "หลังส่งมอบงาน", pct: 50, amount: 0 },
+  ];
+
+  const [form, setForm] = useState(quote ? { ...quote, paymentInstallments: quote.paymentInstallments || getDefaultInstallments() } : {
     id: genId(), quoteNo: getNextQuoteNo(), customerName: "", address: "", phone: "", project: "",
     date: today(), validDays: 30, items: [], includeVat: true,
     discount: 0, overheadPct: 0, paymentTerms: "", remarks: "*งานนอกเหนือจากงานนี้เป็นงานเพิ่มเติมได้",
     logo: localStorage.getItem("tt_company_logo") || COMPANY_LOGO, signature: null,
+    paymentInstallments: getDefaultInstallments(),
   });
   const [tab, setTab] = useState("info");
   const [dbSearch, setDbSearch] = useState("");
@@ -411,8 +417,32 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
   const updateItem = useCallback((id, k, v) => { setForm(f => ({ ...f, items: f.items.map(i => i.id === id ? { ...i, [k]: v } : i) })); }, []);
   const removeItem = useCallback((id) => { setForm(f => ({ ...f, items: f.items.filter(i => i.id !== id) })); }, []);
 
+  const installmentsTotalPct = useMemo(() =>
+    (form.paymentInstallments || []).reduce((s, inst) => s + Number(inst.pct), 0),
+    [form.paymentInstallments]
+  );
+
+  const addInstallment = () => {
+    const n = (form.paymentInstallments || []).length + 1;
+    setForm(f => ({ ...f, paymentInstallments: [...(f.paymentInstallments || []), { id: genId(), label: `งวดที่ ${n}`, pct: 0, amount: 0 }] }));
+  };
+
+  const updateInstallment = (id, k, v) => {
+    setForm(f => ({ ...f, paymentInstallments: (f.paymentInstallments || []).map(inst =>
+      inst.id === id ? { ...inst, [k]: v } : inst
+    ) }));
+  };
+
+  const removeInstallment = (id) => {
+    if ((form.paymentInstallments || []).length <= 1) return;
+    setForm(f => ({ ...f, paymentInstallments: (f.paymentInstallments || []).filter(inst => inst.id !== id) }));
+  };
+
   function handleSave() {
-    const q = { ...form, subtotal, overhead, afterOverhead, discountAmt, vat, grandTotal };
+    const installments = (form.paymentInstallments || []).map(inst => ({
+      ...inst, amount: grandTotal * (Number(inst.pct) / 100)
+    }));
+    const q = { ...form, subtotal, overhead, afterOverhead, discountAmt, vat, grandTotal, paymentInstallments: installments };
     saveQuote(q);
     showToast(isEdit ? "บันทึกการแก้ไขแล้ว" : "สร้างใบเสนอราคาแล้ว");
     navTo(SCREENS.VIEW_QUOTE, q);
@@ -486,9 +516,9 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
           <div>
             <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <SumRow label="รวมค่าแรง/วัสดุ" value={formatMoney(subtotal)} />
-              <div style={{ margin: "10px 0" }}><Label>Overhead & Profit (%)</Label><input type="number" style={inputStyle} value={form.overheadPct} onChange={e => setForm(f => ({ ...f, overheadPct: e.target.value }))} placeholder="0" /></div>
+              <div style={{ margin: "10px 0" }}><Label>Overhead & Profit (%)</Label><input type="number" style={inputStyle} value={form.overheadPct} onChange={e => setForm(f => ({ ...f, overheadPct: Number(e.target.value) }))} placeholder="0" /></div>
               {overhead > 0 && <SumRow label="Overhead & Profit" value={formatMoney(overhead)} />}
-              <div style={{ margin: "10px 0" }}><Label>ส่วนลด (บาท)</Label><input type="number" style={inputStyle} value={form.discount} onChange={e => setForm(f => ({ ...f, discount: e.target.value }))} placeholder="0" /></div>
+              <div style={{ margin: "10px 0" }}><Label>ส่วนลด (บาท)</Label><input type="number" style={inputStyle} value={form.discount} onChange={e => setForm(f => ({ ...f, discount: Number(e.target.value) }))} placeholder="0" /></div>
               <div style={{ margin: "10px 0", display: "flex", alignItems: "center", gap: 10 }}>
                 <input type="checkbox" id="vat" checked={form.includeVat} onChange={e => setForm(f => ({ ...f, includeVat: e.target.checked }))} />
                 <label htmlFor="vat" style={{ fontSize: 13, color: "#aaa" }}>รวมภาษีมูลค่าเพิ่ม 7%</label>
@@ -499,8 +529,31 @@ function QuoteFormScreen({ navTo, priceDb, saveQuote, quote, showToast, quotes }
                 <span style={{ fontWeight: 700, fontSize: 18, color: "#c8a96e" }}>฿{formatMoney(grandTotal)}</span>
               </div>
             </div>
-            <Label>เงื่อนไขการชำระเงิน</Label>
-            <textarea style={{ ...inputStyle, height: 60, resize: "none" }} value={form.paymentTerms} onChange={e => setForm(f => ({ ...f, paymentTerms: e.target.value }))} placeholder="เช่น งวดที่ 1: 50% ก่อนเริ่มงาน..." />
+
+            <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <Label>งวดการชำระเงิน (Installments)</Label>
+              <div style={{ marginTop: 8 }}>
+                {(form.paymentInstallments || []).map((inst, idx) => {
+                  const instAmt = grandTotal * (Number(inst.pct) / 100);
+                  return (
+                    <div key={inst.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, color: "#555", minWidth: 14 }}>{idx + 1}</span>
+                      <input style={{ ...inputStyle, flex: 2 }} value={inst.label} onChange={e => updateInstallment(inst.id, "label", e.target.value)} placeholder="รายละเอียดงวด" />
+                      <input type="number" style={{ ...inputStyle, width: 60 }} value={inst.pct} onChange={e => updateInstallment(inst.id, "pct", Number(e.target.value))} placeholder="%" />
+                      <span style={{ fontSize: 11, color: "#c8a96e", minWidth: 70, textAlign: "right" }}>฿{formatMoney(instAmt)}</span>
+                      <button onClick={() => removeInstallment(inst.id)} style={{ background: "none", border: "none", color: "#c8423a", cursor: "pointer", fontSize: 14, padding: 2 }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+              {installmentsTotalPct !== 100 && (
+                <div style={{ fontSize: 11, color: "#f5a05a", marginTop: 4, padding: "6px 8px", background: "#1a0e00", borderRadius: 6 }}>
+                  ⚠ เปอร์เซ็นรวม {installmentsTotalPct}% ยังไม่เท่ากับ 100%
+                </div>
+              )}
+              <button onClick={addInstallment} style={{ ...btnSm("#555"), width: "100%", padding: "8px", borderRadius: 8, fontSize: 12, marginTop: 6 }}>+ เพิ่มงวด</button>
+            </div>
+
             <button onClick={handleSave} style={{ width: "100%", padding: 14, background: "#c8a96e", border: "none", borderRadius: 10, color: "#000", fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 8 }}>💾 บันทึกใบเสนอราคา</button>
           </div>
         )}
@@ -804,6 +857,10 @@ newPriceItems=รายการใหม่ที่ไม่มีในฐา
       items: (result.items || []).map(i => ({ ...i, id: genId() })),
       remarks: result.remarks || "*งานนอกเหนือจากงานนี้เป็นงานเพิ่มเติมได้",
       includeVat: true, discount: Number(result.discount) || 0, overheadPct: Number(result.overheadPct) || 0, paymentTerms: result.paymentTerms || "",
+      paymentInstallments: [
+        { id: genId(), label: "ก่อนเริ่มงาน", pct: 50, amount: 0 },
+        { id: genId(), label: "หลังส่งมอบงาน", pct: 50, amount: 0 },
+      ],
       attachments: attachments.map(a => ({ id: a.id, name: a.name, data: a.data, isImage: a.isImage, mediaType: a.mediaType })),
     };
     const subtotal = q.items.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0);
