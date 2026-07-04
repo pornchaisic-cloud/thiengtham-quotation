@@ -89,6 +89,21 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
     // ── Row 1: spacer (matches reference rowHeight 21.75) ─────────
     ws.getRow(1).height = 21.75;
 
+    // ── Logo image (top-right corner, S2:U6 like reference) ───────
+    let logoImageId = null;
+    if (quote.logo && typeof quote.logo === "string") {
+      try {
+        const logoBase64 = quote.logo.includes(",") ? quote.logo.split(",")[1] : quote.logo;
+        logoImageId = wb.addImage({ base64: logoBase64, extension: "png" });
+        ws.addImage(logoImageId, {
+          tl: { col: 18, row: 1 },    // S2 (zero-indexed)
+          br: { col: 20.999, row: 6 }, // U6
+        });
+      } catch (e) {
+        console.warn("Excel logo add failed:", e);
+      }
+    }
+
     // ── Row 2: subcontractor name top-right (D2:G2) ───────────────
     ws.getRow(2).height = 21.75;
     ws.mergeCells("D2:G2");
@@ -232,7 +247,12 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const num = nums[i] || "";
-      ws.getRow(rowIdx).height = 19.5;
+      // Category: keep fixed height. Item: auto-fit to support wrapText for long names.
+      if (item.type !== "category") {
+        ws.getRow(rowIdx).height = undefined;  // auto-fit
+      } else {
+        ws.getRow(rowIdx).height = 19.5;
+      }
       if (item.type === "category") {
         ws.mergeCells(`A${rowIdx}:B${rowIdx}`);
         setCell(rowIdx, 1, num, boldFont, centerAlign,
@@ -255,7 +275,8 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
         setCell(rowIdx, 1, num, normalFont, centerAlign,
           { top: thin, bottom: thin, left: thin, right: thin });
         ws.mergeCells(`C${rowIdx}:I${rowIdx}`);
-        setCell(rowIdx, 3, item.name, normalFont, leftAlign,
+        setCell(rowIdx, 3, item.name, normalFont,
+          { horizontal: "left", vertical: "center", wrapText: true, indent: 1 },
           { top: thin, bottom: thin, left: thin, right: thin });
         ws.mergeCells(`J${rowIdx}:M${rowIdx}`);
         setCell(rowIdx, 10, Number(item.qty), normalFont,
@@ -504,6 +525,20 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
     ws.mergeCells(`L${sigRow + 5}:U${sigRow + 5}`);
     setCell(sigRow + 5, 12, " ……………/………………../…………...", smallFont,
       { horizontal: "center", vertical: "center" }, noBorder);
+
+    // ── Signature image (L36:U42 — sits over the "ในนาม" signature block) ──
+    if (quote.signature && typeof quote.signature === "string") {
+      try {
+        const sigBase64 = quote.signature.includes(",") ? quote.signature.split(",")[1] : quote.signature;
+        const sigImageId = wb.addImage({ base64: sigBase64, extension: "png" });
+        ws.addImage(sigImageId, {
+          tl: { col: 11, row: 35 },    // L36 (zero-indexed)
+          br: { col: 20.999, row: 42 }, // U42
+        });
+      } catch (e) {
+        console.warn("Excel signature add failed:", e);
+      }
+    }
 
     // ── Done ─────────────────────────────────────────────────────
     const wbout = await wb.xlsx.writeBuffer();

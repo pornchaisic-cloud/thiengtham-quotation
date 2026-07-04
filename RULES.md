@@ -13,6 +13,18 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 13 — Excel export logo/signature image + Android storage cleanup + splash resize
+  - `src/components/ViewQuoteScreen.jsx` — เพิ่ม logo (S2:U6) + signature (L36:U42) ใน Excel export ผ่าน `wb.addImage()` (ตำแหน่ง verified กับ reference.xlsx ผ่าน `scripts/image_positions.py`)
+  - `src/components/ViewQuoteScreen.jsx` — Item rows: `height = undefined` (auto-fit) + เพิ่ม `wrapText: true, indent: 1` ที่ item name cell — รองรับชื่อ item ยาวขึ้นบรรทัด
+  - `src/utils/fileHelper.js` — ลบ fallback `Directory.External` (เหลือแค่ `Directory.Documents` → fail แสดง toast) — สอดคล้องกับ manifest ที่ลบ storage permissions
+  - `android/app/src/main/AndroidManifest.xml` — ลบ `requestLegacyExternalStorage="true"`, `WRITE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE` (ใช้ FileProvider + `Directory.Documents` แทน — Android 13+ scoped storage)
+  - Splash images — resize 12 ไฟล์ (`drawable[-port|-land]-{m,h,xh,xxh,xxxh}dpi/splash.png` + master `drawable/splash.png`) เป็น TT logo centered บนพื้น `#0a0a0a` (1024px master, optimize=True)
+  - `scripts/resize_splash.py` (new) — PIL script สร้าง splash ทุก density
+  - `scripts/image_positions.py` (new) — extract TwoCellAnchor `_from/_to` ของ images ใน reference.xlsx (verify: logo S2→U6, signature L36→U42)
+  - `scripts/compare_xlsx.py` (new) — diff cell-by-cell ref vs app-generated (merged cells, widths, heights, images, print area)
+  - `scripts/compare_pdf.py` (new) — diff text + layout ระหว่าง ref vs app PDF
+  - **Verified safe**: build 2.77s ผ่าน, image positions match reference เป๊ะ (verified ผ่าน `image_positions.py`)
+
 - checkpoint 12 — CLEANUP_PLAN.md Phase 7 (Code-split exceljs + html2canvas + jspdf via dynamic import)
   - `src/components/ViewQuoteScreen.jsx` — ลบ top-level imports ของ exceljs, html2canvas, jspdf → dynamic `import()` ใน `buildExcelBlob()` / `buildPdfBlob()`
   - `src/components/PriceDbScreen.jsx` — ลบ top-level import ของ exceljs → dynamic `import()` ใน `handleExcelImport()` (silence Vite INEFFECTIVE_DYNAMIC_IMPORT warning)

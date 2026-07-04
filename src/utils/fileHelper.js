@@ -26,16 +26,8 @@ export async function saveFileToDevice(blob, fileName, showToast, setShowExportB
     return true;
   } catch (e) {
     console.error("Directory.Documents failed:", e);
-    try {
-      await Filesystem.writeFile({ path: "Quotations/" + fileName, data: base64, directory: Directory.External, recursive: true });
-      showToast("💾 บันทึกไฟล์สำเร็จ");
-      if (setShowExportBtn) setShowExportBtn(true);
-      return true;
-    } catch (e2) {
-      console.error("Directory.External also failed:", e2);
-      showToast("❌ ไม่สามารถบันทึกไฟล์ได้", "danger");
-      return false;
-    }
+    showToast("❌ ไม่สามารถบันทึกไฟล์ได้", "danger");
+    return false;
   }
 }
 
