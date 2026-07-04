@@ -10,7 +10,7 @@ import PriceDbScreen from "./components/PriceDbScreen";
 import ViewQuoteScreen from "./components/ViewQuoteScreen";
 import { saveFileToDevice, shareFileNative, isNative, blobToBase64 } from "./utils/fileHelper";
 import { COMPANY_INFO, COMPANY_LOGO, INITIAL_PRICE_DB, SCREENS, genId, formatMoney, today, thaiDateStr, getItemNumbers } from "./utils/helpers";
-import { inputStyle, btnSm, btnKey, Label, SumRow } from "./utils/styles";
+import { inputStyle, btnSm, btnKey, Label, SumRow } from "./utils/styles.jsx";
 import { getUserApiKeys, getAllApiKeys, getAnthropicApiKeys, getOpenRouterKeys, OPENROUTER_BUILTIN_KEY } from "./utils/apiKeys";
 
 // ---------------------------------------------------------------------------

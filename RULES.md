@@ -13,6 +13,13 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 9 — CLEANUP_PLAN.md Phase 4 (explicit `.jsx` import paths)
+  - `src/App.jsx` — `from "./utils/styles"` → `from "./utils/styles.jsx"`
+  - `src/components/ViewQuoteScreen.jsx` — `from "../utils/styles"` → `from "../utils/styles.jsx"`
+  - `src/components/PriceDbScreen.jsx` — เหมือนกัน
+  - `src/components/TransferScreen.jsx` — เหมือนกัน
+  - **Verified safe**: build ผ่าน, bundle size เท่าเดิม (2,374.92 kB)
+
 - checkpoint 8 — Dead import cleanup (CLEANUP_PLAN.md Phase 1-3)
   - `src/App.jsx` — ลบ 10 dead imports (React, Capacitor, supabase, BUCKET_NAME, XLSX, html2canvas, jsPDF, Filesystem, Directory, Share, ThaiBaht)
   - `src/components/ViewQuoteScreen.jsx` — ลบ 3 dead imports (React, ThaiBaht, inputStyle)

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import * as sync from "../lib/sync";
 import Header from "./Header";
-import { inputStyle } from "../utils/styles";
+import { inputStyle } from "../utils/styles.jsx";
 
 export default function TransferScreen({ navTo, showToast, quotes, setQuotes, priceDbMeta, setPriceDbMeta }) {
   const [tab, setTab] = useState("send");

@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Header from "./Header";
-import { inputStyle, btnSm, Label } from "../utils/styles";
+import { inputStyle, btnSm, Label } from "../utils/styles.jsx";
 import { formatMoney } from "../utils/helpers";
 
 export default function PriceDbScreen({ priceDb, setPriceDb, showToast, navTo }) {
