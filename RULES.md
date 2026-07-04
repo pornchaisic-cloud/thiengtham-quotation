@@ -13,6 +13,18 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 14 — Hotfix: บันทึกไฟล์ไม่ได้ (PDF/Excel) บน Android
+  - **Root cause** (จาก checkpoint 13): ลบ `WRITE/READ_EXTERNAL_STORAGE` + `requestLegacyExternalStorage` + `Directory.External` fallback ออก → Capacitor Filesystem ขาด permission + ไม่มี fallback
+  - **Capacitor plugin** (`FilesystemPlugin.kt:36-51`) ประกาศ permissions ที่จำเป็นสำหรับ `Directory.Documents`/`External` บน Android 11-12
+  - **แก้** (`src/utils/fileHelper.js`): 3-tier fallback
+    1. `Directory.Documents` → Android ≤ 12 with permission
+    2. `Directory.External` → Android ≤ 12 fallback
+    3. `Directory.Cache` + `Share.share()` → Android 13+ scoped storage (user เลือกแอปปลายทางเอง)
+  - **แก้** (`android/app/src/main/AndroidManifest.xml`): restore `WRITE_EXTERNAL_STORAGE` (maxSdkVersion=32), `READ_EXTERNAL_STORAGE` (maxSdkVersion=32), `requestLegacyExternalStorage="true"`
+  - **API change**: `saveFileToDevice` return `{ saved, shared }` แทน `boolean` (backward compatible — caller ใช้ fire-and-forget)
+  - **UX**: ถ้า Documents/External fail → Cache + Share ก็ยังได้ไฟล์ (Android 13+ ผ่าน Share sheet)
+  - **Verified**: build 14s ✅ ผ่าน
+
 - checkpoint 13 — Excel export logo/signature image + Android storage cleanup + splash resize
   - `src/components/ViewQuoteScreen.jsx` — เพิ่ม logo (S2:U6) + signature (L36:U42) ใน Excel export ผ่าน `wb.addImage()` (ตำแหน่ง verified กับ reference.xlsx ผ่าน `scripts/image_positions.py`)
   - `src/components/ViewQuoteScreen.jsx` — Item rows: `height = undefined` (auto-fit) + เพิ่ม `wrapText: true, indent: 1` ที่ item name cell — รองรับชื่อ item ยาวขึ้นบรรทัด
