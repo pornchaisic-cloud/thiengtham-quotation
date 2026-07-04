@@ -1,5 +1,4 @@
 import { useState, useRef, useMemo } from "react";
-import ExcelJS from "exceljs";
 import Header from "./Header";
 import { inputStyle, btnSm, Label } from "../utils/styles.jsx";
 import { formatMoney } from "../utils/helpers";
@@ -20,6 +19,8 @@ export default function PriceDbScreen({ priceDb, setPriceDb, showToast, navTo })
     setImporting(true);
     e.target.value = "";
     try {
+      // Lazy-load ExcelJS (only needed when user clicks import)
+      const { default: ExcelJS } = await import("exceljs");
       const arrayBuffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);

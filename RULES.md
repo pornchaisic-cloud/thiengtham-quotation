@@ -13,6 +13,18 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 12 — CLEANUP_PLAN.md Phase 7 (Code-split exceljs + html2canvas + jspdf via dynamic import)
+  - `src/components/ViewQuoteScreen.jsx` — ลบ top-level imports ของ exceljs, html2canvas, jspdf → dynamic `import()` ใน `buildExcelBlob()` / `buildPdfBlob()`
+  - `src/components/PriceDbScreen.jsx` — ลบ top-level import ของ exceljs → dynamic `import()` ใน `handleExcelImport()` (silence Vite INEFFECTIVE_DYNAMIC_IMPORT warning)
+  - **Optimisation**: buildPdfBlob kick off Promise.all dynamic imports ตั้งแต่ต้นฟังก์ชัน เพื่อให้ sync HTML gen ทำงานขนาน
+  - **Bundle impact**:
+    - Main: 2,375 KB → **513 KB** (-78%, 689 KB → 142 KB gzipped)
+    - exceljs lazy chunk: 930 KB (256 KB gzipped) — load เมื่อกด import/export
+    - jspdf lazy chunk: 400 KB (130 KB gzipped) — load เมื่อกด export PDF
+    - html2canvas lazy chunk: 200 KB (47 KB gzipped) — load เมื่อกด export PDF
+  - **Verified safe**: test_exceljs_import.cjs ผ่าน 5/5 (PriceDbScreen logic), build 1.14s, ไม่มี Vite warning
+  - **UX**: กด export ครั้งแรก delay ~1-2s (dynamic import) → toast "⏳ กำลังเตรียมไฟล์..." ครอบอยู่แล้ว
+
 - checkpoint 11 — CLEANUP_PLAN.md Phase 6 (ลบ xlsx dep — migrate ไป ExcelJS)
   - `src/components/PriceDbScreen.jsx` — เปลี่ยน `import * as XLSX from "xlsx"` → `import ExcelJS from "exceljs"`
   - เขียน parse logic ใหม่: `new ExcelJS.Workbook()` + `workbook.xlsx.load()` + `sheet.eachRow` + manual empty-cell fill (ทดแทน `defval: ""`)
