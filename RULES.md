@@ -13,7 +13,17 @@
 ---
 
 **Checkpoint ล่าสุด:**
-- checkpoint 7 (pending) — QN 26 layout 100% match (Phase 1-6 ของ PLAN_EXCEL_PDF_MATCH.md)
+- checkpoint 8 — Dead import cleanup (CLEANUP_PLAN.md Phase 1-3)
+  - `src/App.jsx` — ลบ 10 dead imports (React, Capacitor, supabase, BUCKET_NAME, XLSX, html2canvas, jsPDF, Filesystem, Directory, Share, ThaiBaht)
+  - `src/components/ViewQuoteScreen.jsx` — ลบ 3 dead imports (React, ThaiBaht, inputStyle)
+  - `src/components/PriceDbScreen.jsx` — ลบ React (Vite auto JSX runtime)
+  - `src/components/TransferScreen.jsx` — ลบ React (Vite auto JSX runtime)
+  - `CLEANUP_PLAN.md` (new) — แผน cleanup 7 Phase (Phase 1-3 done, 4-5 pending, 6-7 optional)
+  - `scripts/check_imports2.cjs` (new) — helper ตรวจ dead imports
+  - `scripts/check_unused_imports.cjs` (new) — helper ตรวจ unused imports
+  - **Verified safe**: bundle ยังมี html2canvas/jspdf/ExcelJS/XLSX ครบ, build ผ่าน
+
+- checkpoint 7 — QN 26 layout 100% match (Phase 1-6 ของ PLAN_EXCEL_PDF_MATCH.md)
   - `src/utils/helpers.js` — `COMPANY_INFO.bank` แก้ space/format ให้ตรงต้นฉบับ QN 26
   - `src/components/ViewQuoteScreen.jsx` — แก้ เงื่อนไขการชำระเงิน ใน HTML preview (ลบ header, format งวดแบบ Excel, แยกบรรทัด "ช่องทาง/สั่งจ่าย/ธนาคาร") — XLSX export ตรงอยู่แล้ว
   - `src/App.jsx` — เปลี่ยน default installments จาก 3 งวด (50/30/20) → 2 งวด 50/50 label "ก่อนเริ่มงาน" / "หลังส่งมอบงาน" (ตรงกับ 124/128 ใบใน QN 26)
