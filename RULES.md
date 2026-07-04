@@ -9,6 +9,8 @@
 7. **ใช้ภาษาไทยในการสื่อสาร**
 8. **ใช้ Playwright สำหรับ browser automation** (สร้าง GitHub/Supabase)
 9. **ทำงานให้เร็ว** (ที่บอกล่าสุด)
+10. **ห้ามลบ runtime-critical code (permissions, fallbacks, storage paths) โดยไม่ verify บน Android จริง** — เรียนรู้จาก checkpoint 13 → 14 (ลบ storage permissions + `Directory.External` fallback ออกโดยไม่ทดสอบ → APK ใหม่ save ไฟล์ไม่ได้ → user ต้องรอ hotfix)
+11. **ส่ง APK ให้ user = ต้อง smoke test ก่อน** — install → tap main flows → ตรวจ toast / logcat ไม่ใช่แค่ `gradlew build` ผ่าน
 
 ---
 
