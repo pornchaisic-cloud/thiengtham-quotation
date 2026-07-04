@@ -1,13 +1,34 @@
 export const COMPANY_INFO = {
   name: "บริษัท เที่ยงทำ ดีเวลล็อปเมนท์ จำกัด",
-  address: "เลขที่ 10/15 ซ.1/3 หมู่ที่ 6 ถ.รัตนาธิเบศร์ ต.เสาธงหิน อ.บางใหญ่ จ.นนทบุรี 11140",
+  address: "เลขที่ 10/15 ซ.1/3 หมู่ที่ 6 ถ.รัตนาธิเบศร์ ต.เสาธงหิน อ.บางใหญ่ จ.นนทบุรี 11140 (สำนักงานใหญ่)",
   phone: "062-069-8888",
-  taxId: "1729900000000",
+  taxId: "1729900082674",
   bank: "ธ.ไทยพาณิชย์ บัญชี ออมทรัพย์  เลขที่บัญชี 1174057341",
   subcontractorName: "นายพรชัย ชูพรม",
 };
 
 export const COMPANY_LOGO = "/logo.png";
+
+// Preload default logo as base64 so buildExcelBlob can inline it without runtime fetch.
+// Lazy: load only when needed (faster app startup).
+let _defaultLogoBase64Cache = null;
+export async function getDefaultLogoBase64() {
+  if (_defaultLogoBase64Cache !== null) return _defaultLogoBase64Cache;
+  try {
+    const res = await fetch(COMPANY_LOGO);
+    const blob = await res.blob();
+    _defaultLogoBase64Cache = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onloadend = () => resolve(r.result.split(",")[1]);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn("Failed to preload default logo:", e);
+    _defaultLogoBase64Cache = "";
+  }
+  return _defaultLogoBase64Cache;
+}
 
 export const INITIAL_PRICE_DB = [
   { id: 1, name: "แก้ไขผนังแตกร้าว ขูดรอยร้าวและเซาะร่อง V อุดรอยร้าวด้วย non-shrink", unit: "งาน", price: 4650 },

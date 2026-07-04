@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Header from "./Header";
 import { saveFileToDevice, shareFileNative, isNative } from "../utils/fileHelper";
-import { COMPANY_INFO, formatMoney, thaiDateStr, getItemNumbers, thaiBahtText, SCREENS } from "../utils/helpers";
+import { COMPANY_INFO, formatMoney, thaiDateStr, getItemNumbers, thaiBahtText, SCREENS, getDefaultLogoBase64 } from "../utils/helpers";
 import { btnSm, SumRow } from "../utils/styles.jsx";
 
 export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
@@ -14,8 +14,10 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
   async function buildExcelBlob() {
     // Lazy-load ExcelJS (heavy lib, only needed on export)
     const { default: ExcelJS } = await import("exceljs");
+    // Preload default logo (fallback when quote.logo is just a path like "/logo.png")
+    const defaultLogoB64 = await getDefaultLogoBase64();
     const wb = new ExcelJS.Workbook();
-    wb.creator = COMPANY_INFO.name;
+    wb.creator = COMPANY_INFO.subcontractorName || COMPANY_INFO.name;
     const ws = wb.addWorksheet("ใบเสนอราคา");
 
     const nums = getItemNumbers(quote.items);
@@ -91,21 +93,29 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
 
     // ── Logo image (top-right corner, S2:U6 like reference) ───────
     let logoImageId = null;
-    if (quote.logo && typeof quote.logo === "string") {
-      try {
-        const logoBase64 = quote.logo.includes(",") ? quote.logo.split(",")[1] : quote.logo;
-        logoImageId = wb.addImage({ base64: logoBase64, extension: "png" });
+    try {
+      let logoB64 = null;
+      if (quote.logo && typeof quote.logo === "string" && quote.logo.length > 64) {
+        logoB64 = quote.logo.includes(",") ? quote.logo.split(",")[1] : quote.logo;
+      }
+      if (!logoB64 && defaultLogoB64) logoB64 = defaultLogoB64;
+      if (logoB64) {
+        logoImageId = wb.addImage({ base64: logoB64, extension: "png" });
         ws.addImage(logoImageId, {
           tl: { col: 18, row: 1 },    // S2 (zero-indexed)
           br: { col: 20.999, row: 6 }, // U6
         });
-      } catch (e) {
-        console.warn("Excel logo add failed:", e);
       }
+    } catch (e) {
+      console.warn("Excel logo add failed:", e);
     }
 
-    // ── Row 2: subcontractor name top-right (D2:G2) ───────────────
+    // ── Row 2: "ชื่อผู้รับเหมา" label (A2:C2) + name (D2:G2) ─────────
     ws.getRow(2).height = 21.75;
+    ws.mergeCells("A2:C2");
+    setCell(2, 1, "ชื่อผู้รับเหมา", boldFont,
+      { horizontal: "left", vertical: "center", indent: 1 },
+      { top: thin, bottom: thin, left: thin, right: thin });
     ws.mergeCells("D2:G2");
     setCell(2, 4, subcontractorName, boldFont,
       { horizontal: "center", vertical: "center" },
@@ -126,8 +136,12 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
       { horizontal: "left", vertical: "center", indent: 1 },
       { top: thin, bottom: thin, left: thin, right: thin });
 
-    // ── Row 5: tax ID (E5:I5) ─────────────────────────────────────
+    // ── Row 5: "เลขประจำตัวผู้เสียภาษี" label (A5:D5) + tax ID (E5:I5) ──
     ws.getRow(5).height = 21;
+    ws.mergeCells("A5:D5");
+    setCell(5, 1, "เลขประจำตัวผู้เสียภาษี", normalFont,
+      { horizontal: "left", vertical: "center", indent: 1 },
+      { top: thin, bottom: thin, left: thin, right: thin });
     ws.mergeCells("E5:I5");
     setCell(5, 5, COMPANY_INFO.taxId, normalFont,
       { horizontal: "left", vertical: "center", indent: 1 },
@@ -527,17 +541,20 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
       { horizontal: "center", vertical: "center" }, noBorder);
 
     // ── Signature image (L36:U42 — sits over the "ในนาม" signature block) ──
-    if (quote.signature && typeof quote.signature === "string") {
-      try {
-        const sigBase64 = quote.signature.includes(",") ? quote.signature.split(",")[1] : quote.signature;
-        const sigImageId = wb.addImage({ base64: sigBase64, extension: "png" });
+    try {
+      let sigB64 = null;
+      if (quote.signature && typeof quote.signature === "string" && quote.signature.length > 64) {
+        sigB64 = quote.signature.includes(",") ? quote.signature.split(",")[1] : quote.signature;
+      }
+      if (sigB64) {
+        const sigImageId = wb.addImage({ base64: sigB64, extension: "png" });
         ws.addImage(sigImageId, {
           tl: { col: 11, row: 35 },    // L36 (zero-indexed)
           br: { col: 20.999, row: 42 }, // U42
         });
-      } catch (e) {
-        console.warn("Excel signature add failed:", e);
       }
+    } catch (e) {
+      console.warn("Excel signature add failed:", e);
     }
 
     // ── Done ─────────────────────────────────────────────────────
@@ -631,7 +648,7 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
     <div style="display:flex; gap:12px; flex:1">
       ${logoHtml}
       <div style="flex:1">
-        <div style="font-weight:700; font-size:15px; color:#000">${COMPANY_INFO.name}</div>
+        <div style="font-weight:700; font-size:13px; color:#000">ชื่อผู้รับเหมา : ${quote.subcontractorName || COMPANY_INFO.subcontractorName || ""}</div>
         <div style="font-size:9px; line-height:1.5; color:#333">
           ${COMPANY_INFO.address}<br>
           โทร: ${COMPANY_INFO.phone} | เลขประจำตัวผู้เสียภาษี: ${COMPANY_INFO.taxId}

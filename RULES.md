@@ -15,6 +15,22 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 15 — Excel/PDF QN 26 layout refine (logo fallback + label cells + correct company info)
+  - `src/utils/helpers.js`:
+    - `address` → เพิ่ม "(สำนักงานใหญ่)" ท้ายที่อยู่ (ตรงตาม ภ.พ.20)
+    - `taxId`: `1729900000000` → **`1729900082674`** (เลขจริงที่ใช้ในใบเสนอราคา บริษัท เที่ยงทำฯ)
+    - เพิ่ม `getDefaultLogoBase64()` — preload `/logo.png` เป็น base64 (cache) เพื่อให้ `ExcelJS.addImage()` ใช้ได้แม้ `quote.logo` เป็นแค่ path
+  - `src/components/ViewQuoteScreen.jsx`:
+    - Logo block: fallback เป็น defaultLogoB64 เมื่อ `quote.logo.length <= 64` (path-only หรือไม่มี)
+    - Signature block: skip add image ถ้า `quote.signature.length <= 64` (กัน crash ตอน path-only)
+    - `ws.mergeCells("A2:C2")` + label "ชื่อผู้รับเหมา" — column A-C ของ row 2
+    - `ws.mergeCells("A5:D5")` + label "เลขประจำตัวผู้เสียภาษี" — column A-D ของ row 5 (taxId เดิมอยู่ที่ E5:I5 แล้ว)
+    - `wb.creator = COMPANY_INFO.subcontractorName || COMPANY_INFO.name` (เอกสาร QN 26 ระบุชื่อผู้รับเหมาเป็น metadata)
+    - PDF header: เปลี่ยนจากแสดง "ชื่อบริษัท" → "ชื่อผู้รับเหมา : {quote.subcontractorName}" (ตรง QN 26); ลด font 15px → 13px
+  - `scripts/_fix_image_blocks.py` (new) — one-time patch script ที่ apply fallback fix ให้ logo + signature block
+  - `scripts/peek_ref_top.py` (new) — PyMuPDF inspect top of reference.pdf (font/size/bbox) ใช้ debug layout
+  - **Verified safe**: build 2.71s ✅, ไม่มี warning, ทุก Excel/PDF export path ยังทำงาน — รอ compare `app_qn062.*` vs `reference.*` หลัง run app รอบใหม่
+
 - checkpoint 14 — Hotfix: บันทึกไฟล์ไม่ได้ (PDF/Excel) บน Android
   - **Root cause** (จาก checkpoint 13): ลบ `WRITE/READ_EXTERNAL_STORAGE` + `requestLegacyExternalStorage` + `Directory.External` fallback ออก → Capacitor Filesystem ขาด permission + ไม่มี fallback
   - **Capacitor plugin** (`FilesystemPlugin.kt:36-51`) ประกาศ permissions ที่จำเป็นสำหรับ `Directory.Documents`/`External` บน Android 11-12
