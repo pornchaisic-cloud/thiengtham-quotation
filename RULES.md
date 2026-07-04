@@ -13,6 +13,13 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 11 — CLEANUP_PLAN.md Phase 6 (ลบ xlsx dep — migrate ไป ExcelJS)
+  - `src/components/PriceDbScreen.jsx` — เปลี่ยน `import * as XLSX from "xlsx"` → `import ExcelJS from "exceljs"`
+  - เขียน parse logic ใหม่: `new ExcelJS.Workbook()` + `workbook.xlsx.load()` + `sheet.eachRow` + manual empty-cell fill (ทดแทน `defval: ""`)
+  - `package.json` — ลบ `"xlsx": "^0.18.5"` (ใช้ `npm uninstall xlsx`)
+  - `scripts/test_exceljs_import.cjs` (new) — test script: สร้าง sample .xlsx, parse กลับ, assert 5 cases (empty cells, string price, trim, header skip) ผ่าน 5/5
+  - **Verified safe**: build ผ่าน, **bundle ลดลง 332 KB raw / 112 KB gzipped** (2,375 → 2,043 KB), 'xlsx' ที่เหลือใน bundle คือ ExcelJS internal path เท่านั้น
+
 - checkpoint 10 — CLEANUP_PLAN.md Phase 5 (KeySection setTimeout cleanup)
   - `src/components/KeySection.jsx` — เพิ่ม useRef + useEffect เพื่อ track test-status timeouts
   - ก่อนหน้า: setTimeout fire-and-forget → setState บน unmounted component (React warning) + race เมื่อกด test key เดิมซ้ำ

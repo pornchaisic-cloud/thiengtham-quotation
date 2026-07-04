@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import Header from "./Header";
 import { inputStyle, btnSm, Label } from "../utils/styles.jsx";
 import { formatMoney } from "../utils/helpers";
@@ -21,10 +21,26 @@ export default function PriceDbScreen({ priceDb, setPriceDb, showToast, navTo })
     e.target.value = "";
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      const sheet = workbook.worksheets[0];
+      if (!sheet) {
+        showToast("ไฟล์ไม่มี sheet", "danger");
+        setImporting(false);
+        return;
+      }
+      // Walk rows with explicit empty-cell fill (mimics xlsx `defval: ""`)
+      const maxCol = Math.max(sheet.actualColumnCount || 0, 3);
+      const rows = [];
+      sheet.eachRow({ includeEmpty: true }, (row) => {
+        const rowData = new Array(maxCol).fill("");
+        for (let c = 1; c <= maxCol; c++) {
+          const cell = row.getCell(c);
+          const v = cell.value;
+          rowData[c - 1] = (v === null || v === undefined) ? "" : v;
+        }
+        rows.push(rowData);
+      });
       const imported = [];
       let startRow = 0;
       if (rows.length > 0) {
