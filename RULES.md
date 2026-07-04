@@ -13,6 +13,12 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 10 — CLEANUP_PLAN.md Phase 5 (KeySection setTimeout cleanup)
+  - `src/components/KeySection.jsx` — เพิ่ม useRef + useEffect เพื่อ track test-status timeouts
+  - ก่อนหน้า: setTimeout fire-and-forget → setState บน unmounted component (React warning) + race เมื่อกด test key เดิมซ้ำ
+  - หลัง: testTimeoutsRef เก็บ Map<i, timeoutId>, cleanup useEffect clear ทุก timeout ตอน unmount, clear prev timeout ก่อน schedule ใหม่สำหรับ key เดียวกัน
+  - **Verified safe**: build ผ่าน, bundle +210 bytes (Map + useEffect overhead)
+
 - checkpoint 9 — CLEANUP_PLAN.md Phase 4 (explicit `.jsx` import paths)
   - `src/App.jsx` — `from "./utils/styles"` → `from "./utils/styles.jsx"`
   - `src/components/ViewQuoteScreen.jsx` — `from "../utils/styles"` → `from "../utils/styles.jsx"`

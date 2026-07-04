@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const inputStyle = {
   width: "100%", padding: "10px 12px", background: "#0d0d0d", border: "1px solid #1e1e1e",
@@ -12,6 +12,15 @@ export default function KeySection({ color, title, hint, placeholder, storageKey
   const [editVal, setEditVal] = useState("");
   const [showIdx, setShowIdx] = useState(null);
   const [testStatus, setTestStatus] = useState({});
+  const testTimeoutsRef = useRef(new Map()); // i → timeoutId (clear status after 10s)
+
+  // Clear pending test-status timeouts on unmount (prevents setState on unmounted component)
+  useEffect(() => {
+    return () => {
+      for (const tid of testTimeoutsRef.current.values()) clearTimeout(tid);
+      testTimeoutsRef.current.clear();
+    };
+  }, []);
 
   function save(updated) {
     setKeys(updated);
@@ -96,7 +105,14 @@ export default function KeySection({ color, title, hint, placeholder, storageKey
       } else { errMsg = "รูปแบบคีย์ไม่ถูกต้อง"; }
       setTestStatus(s => ({ ...s, [i]: ok ? "ok" : `fail: ${errMsg}` }));
     } catch (err) { setTestStatus(s => ({ ...s, [i]: `fail: ${err.message}` })); }
-    setTimeout(() => setTestStatus(s => { const n = { ...s }; delete n[i]; return n; }), 10000);
+    // Clear any previous timeout for this key index, then schedule a new one
+    const prev = testTimeoutsRef.current.get(i);
+    if (prev) clearTimeout(prev);
+    const tid = setTimeout(() => {
+      setTestStatus(s => { const n = { ...s }; delete n[i]; return n; });
+      testTimeoutsRef.current.delete(i);
+    }, 10000);
+    testTimeoutsRef.current.set(i, tid);
   }
 
   const bgColor = color + "11";
