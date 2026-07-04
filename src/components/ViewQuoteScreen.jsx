@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import ExcelJS from "exceljs";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import Header from "./Header";
 import { saveFileToDevice, shareFileNative, isNative } from "../utils/fileHelper";
-import { COMPANY_INFO, formatMoney, thaiDateStr, getItemNumbers, ThaiBaht, thaiBahtText, SCREENS } from "../utils/helpers";
-import { btnSm, SumRow, inputStyle } from "../utils/styles";
+import { COMPANY_INFO, formatMoney, thaiDateStr, getItemNumbers, thaiBahtText, SCREENS } from "../utils/helpers";
+import { btnSm, SumRow } from "../utils/styles";
 
 export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }) {
   const [lightbox, setLightbox] = useState(null);

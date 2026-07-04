@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Header from "./Header";
 import { inputStyle, btnSm, Label } from "../utils/styles";

@@ -1,12 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Capacitor } from "@capacitor/core";
-import { supabase, BUCKET_NAME } from "./lib/supabase";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import * as sync from "./lib/sync";
-import * as XLSX from "xlsx";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { Share } from "@capacitor/share";
 
 import Toast from "./components/Toast";
 import ConnectionBanner from "./components/ConnectionBanner";
@@ -16,7 +9,7 @@ import TransferScreen from "./components/TransferScreen";
 import PriceDbScreen from "./components/PriceDbScreen";
 import ViewQuoteScreen from "./components/ViewQuoteScreen";
 import { saveFileToDevice, shareFileNative, isNative, blobToBase64 } from "./utils/fileHelper";
-import { COMPANY_INFO, COMPANY_LOGO, INITIAL_PRICE_DB, SCREENS, genId, formatMoney, today, thaiDateStr, getItemNumbers, ThaiBaht } from "./utils/helpers";
+import { COMPANY_INFO, COMPANY_LOGO, INITIAL_PRICE_DB, SCREENS, genId, formatMoney, today, thaiDateStr, getItemNumbers } from "./utils/helpers";
 import { inputStyle, btnSm, btnKey, Label, SumRow } from "./utils/styles";
 import { getUserApiKeys, getAllApiKeys, getAnthropicApiKeys, getOpenRouterKeys, OPENROUTER_BUILTIN_KEY } from "./utils/apiKeys";
 
