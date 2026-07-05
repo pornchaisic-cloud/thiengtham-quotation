@@ -11,6 +11,13 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
   const imageAttachments = (quote.attachments || []).filter(a => a.isImage);
   const fileAttachments = (quote.attachments || []).filter(a => !a.isImage);
 
+  // subtotal fallback: ถ้า quote.subtotal ไม่มี (เช่น quote เก่า pre-recompute, import, automation inject) → recompute จาก items
+  const subtotalUI = Number(quote.subtotal) ||
+    (Array.isArray(quote.items)
+      ? quote.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0)
+      : 0);
+  const overheadUI = Number(quote.overhead || 0);
+
   async function buildExcelBlob() {
     // Lazy-load ExcelJS (heavy lib, only needed on export)
     const { default: ExcelJS } = await import("exceljs");
@@ -26,7 +33,11 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
     const overhead = Number(quote.overhead || 0);
     const overheadPct = Number(quote.overheadPct || 0);
     const vat = Number(quote.vat || 0);
-    const subtotal = Number(quote.subtotal || 0);
+    // subtotal fallback: ถ้า quote.subtotal ไม่มี (เช่น quote เก่า pre-recompute, import, automation inject) → recompute จาก items
+    const subtotal = Number(quote.subtotal) ||
+      (Array.isArray(quote.items)
+        ? quote.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0)
+        : 0);
     const discountAmt = Number(quote.discountAmt || 0);
     const subtotalWithOverhead = subtotal + overhead;
     const installments = (quote.paymentInstallments || []).map(inst => ({
@@ -608,7 +619,11 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
       import("jspdf"),
     ]);
     const grandTotal = Number(quote.grandTotal || 0);
-    const subtotal = Number(quote.subtotal || 0);
+    // subtotal fallback: ถ้า quote.subtotal ไม่มี (เช่น quote เก่า pre-recompute, import, automation inject) → recompute จาก items
+    const subtotal = Number(quote.subtotal) ||
+      (Array.isArray(quote.items)
+        ? quote.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0)
+        : 0);
     const overhead = Number(quote.overhead || 0);
     const overheadPct = Number(quote.overheadPct || 0);
     const vat = Number(quote.vat || 0);
@@ -760,10 +775,11 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
     });
     document.body.removeChild(wrapper);
 
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
     const imgData = canvas.toDataURL("image/jpeg", 0.92);
-    const pdfW = 210;
-    const pdfH = Math.min((canvas.height / canvas.width) * pdfW, 297);
+    // Letter: 8.5" x 11" = 215.9mm x 279.4mm
+    const pdfW = 215.9;
+    const pdfH = Math.min((canvas.height / canvas.width) * pdfW, 279.4);
     pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
 
     const cleanProject = (quote.project || "ใบเสนอราคา").replace(/[<>:"/\\|?*]/g, "").trim();
@@ -865,9 +881,9 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
         </div>
 
         <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <SumRow label="GROSS TOTAL" value={formatMoney(quote.subtotal)} />
+          <SumRow label="GROSS TOTAL" value={formatMoney(subtotalUI)} />
           {quote.overhead > 0 && <SumRow label={`Overhead&Profit (${quote.overheadPct}%)`} value={formatMoney(quote.overhead)} />}
-          {Number(quote.overhead) > 0 && <SumRow label="GROSS TOTAL (incl O&P)" value={formatMoney(Number(quote.subtotal) + Number(quote.overhead))} />}
+          {overheadUI > 0 && <SumRow label="GROSS TOTAL (incl O&P)" value={formatMoney(subtotalUI + overheadUI)} />}
           {quote.discountAmt > 0 && <SumRow label="ส่วนลด" value={"-" + formatMoney(quote.discountAmt)} />}
           {quote.vat > 0 && <SumRow label="VAT 7%" value={formatMoney(quote.vat)} />}
           <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #1e1e1e", paddingTop: 10, marginTop: 10 }}>
