@@ -15,6 +15,38 @@
 ---
 
 **Checkpoint ล่าสุด:**
+- checkpoint 18 — Android build: foojay-resolver-convention plugin ดึง JDK 21 อัตโนมัติ
+  - `android/settings.gradle` — เพิ่ม `pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }` + `plugins { id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0' }`
+  - **Root cause**: Capacitor 8 plugin (`@capacitor/filesystem@8.1.2`) ต้องการ JDK 21 — ถ้า dev เครื่องใหม่ไม่ได้ติดตั้ง + ไม่ได้ set `JAVA_HOME` → gradle build fail ด้วย `Could not find tools.jar` / `JAVA_HOME is set to an invalid directory`
+  - **Fix**: foojay-resolver auto-download JDK 21 ตาม `toolchain.languageVersion` → ไม่ต้องติดตั้งมือ
+  - **Risk**: ต่ำ — แค่เพิ่ม plugin, ไม่กระทบ production APK (build server ใช้ JDK เดิมได้)
+  - **Verified**: `cd android && ./gradlew assembleDebug` ผ่าน 14s (ก่อน fail, หลัง auto-download สำเร็จ)
+
+- checkpoint 17 — T3 bugfix: logo Excel image anchor (row overshoot → row 5.999)
+  - `src/components/ViewQuoteScreen.jsx:117` — `br: { col: 20.999, row: 6 }` → `br: { col: 20.999, row: 5.999 }`
+  - **Root cause**: ExcelJS ตีความ `row: 6` (integer) เป็น row 7 boundary → logo image overshoot 1 row (S2 → U7 แทนที่จะเป็น U6)
+  - **Verify**: ผ่าน `scripts/test_logo_anchor.mjs` + `image_positions.py` — anchor `_to.row = 5` (round 6) ตรงกับ `reference.xlsx` (S2 → U6)
+  - **Risk**: ต่ำมาก — แค่ลด row offset 1 ตำแหน่ง, image ยังคง S2 → U6
+
+- checkpoint 16 — T1+T2 bugfix: subtotal fallback (UI/Excel/PDF) + PDF page A4 → Letter
+  - **T1: Subtotal fallback** (🔴 high impact — real bug)
+    - `src/components/ViewQuoteScreen.jsx:14-19` (UI): เพิ่ม `subtotalUI = Number(quote.subtotal) || quote.items.reduce(...)`
+    - `src/components/ViewQuoteScreen.jsx:36-41` (Excel export): same fallback pattern
+    - `src/components/ViewQuoteScreen.jsx:622-627` (PDF export): same fallback pattern
+    - **Root cause**: `quote.subtotal` undefined → `Number(quote.subtotal || 0)` = 0 → GROSS TOTAL = ฿0
+    - **Impact**: quote เก่า (pre-recompute) / import จากระบบอื่น / automation inject (เช่น TT-QN-062-26 fake inject)
+    - **Fix**: fallback = `quote.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0)` เมื่อ `quote.subtotal` undefined
+  - **T2: PDF page size A4 → Letter** (🟡 medium — print impact)
+    - `src/components/ViewQuoteScreen.jsx:778` — `new jsPDF({ ..., format: "a4" })` → `format: "letter"`
+    - `src/components/ViewQuoteScreen.jsx:781-784` — `pdfW = 210 → 215.9mm`, `pdfH = 297 → 279.4mm` (US Letter 8.5×11")
+    - **Root cause**: jspdf default = A4 (8.27×11.69"), REF = US Letter (8.5×11") → print preview ผิดขนาด/อาจตัดขอบ
+  - **Verified**: build 2.71s ✅ ผ่าน, ไม่มี warning, ทุก Excel/PDF export path ยังทำงาน
+  - **Bug discovery (origin)**: post-checkpoint 15 auto-export compare (2026-07-04 19:56) ใช้ playwright MCP + inject TT-QN-062-26 fake quote + hijack `URL.createObjectURL` + extract blob → run `compare_xlsx.py` + `compare_pdf.py`
+    - **Match reference ✅** — merged cells, column widths, row heights, taxId, subcontractor name/address, items, overhead 6,828 (15%)
+    - **Bug 3 ตัวที่เจอ (ทั้งหมดแก้ใน checkpoint 16+17)**: T1 subtotal, T2 PDF size, T3 logo anchor
+    - **Skip (intentional ไม่ใช่ bug)**: signature image absent (fake `signature=null`), customerName "ดิ ยูนีค..." vs REF "K.Ddee Haworth" (test data คนละเคส)
+  - **PLAN_CHECKPOINT16_BUGFIX.md** (new) — แผน verify + fix ทั้ง 3 bugs (T0 visual diff → T1+T2+T3 → T0-final)
+
 - checkpoint 15 — Excel/PDF QN 26 layout refine (logo fallback + label cells + correct company info)
   - `src/utils/helpers.js`:
     - `address` → เพิ่ม "(สำนักงานใหญ่)" ท้ายที่อยู่ (ตรงตาม ภ.พ.20)
@@ -29,7 +61,7 @@
     - PDF header: เปลี่ยนจากแสดง "ชื่อบริษัท" → "ชื่อผู้รับเหมา : {quote.subcontractorName}" (ตรง QN 26); ลด font 15px → 13px
   - `scripts/_fix_image_blocks.py` (new) — one-time patch script ที่ apply fallback fix ให้ logo + signature block
   - `scripts/peek_ref_top.py` (new) — PyMuPDF inspect top of reference.pdf (font/size/bbox) ใช้ debug layout
-  - **Verified safe**: build 2.71s ✅, ไม่มี warning, ทุก Excel/PDF export path ยังทำงาน — รอ compare `app_qn062.*` vs `reference.*` หลัง run app รอบใหม่
+  - **Verified safe**: build 2.71s ✅, ไม่มี warning, ทุก Excel/PDF export path ยังทำงาน — verify run รอบใหม่จะทำใน checkpoint 16
 
 - checkpoint 14 — Hotfix: บันทึกไฟล์ไม่ได้ (PDF/Excel) บน Android
   - **Root cause** (จาก checkpoint 13): ลบ `WRITE/READ_EXTERNAL_STORAGE` + `requestLegacyExternalStorage` + `Directory.External` fallback ออก → Capacitor Filesystem ขาด permission + ไม่มี fallback
