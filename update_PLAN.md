@@ -25,8 +25,8 @@
 | P1-8 | ไม่มี offline UI | ConnectionBanner + pending queue เสร็จแล้ว | ✅ แก้แล้ว |
 | P1-9 | API key hardcode | Phase 0 .env เสร็จแล้ว | ✅ แก้แล้ว |
 | P1-10 | form ไม่ reset | component remount แล้ว reset จริง | ✅ ไม่ใช่ปัญหา |
-| P1-11 | label "Claude" แต่ใช้ Gemini/Llama | ยังต้องตรวจ + แก้ | ⚠️ ค้าง |
-| P1-12 | AI ไม่ใช้ overhead/discount/terms | hardcode 0 + prompt ไม่ขอ | ⚠️ ค้าง |
+| P1-11 | label "Claude" แต่ใช้ Gemini/Llama | ตรวจ App.jsx ทุกจุด — ทุก "Claude" อยู่ใน Anthropic path (Claude จริง) — ไม่มี bug; bug หายตอน checkpoint 6 (App.jsx rewrite) | ✅ แก้แล้ว (โดยไม่ตั้งใจ) |
+| P1-12 | AI ไม่ใช้ overhead/discount/terms | createQuoteFromResult อ่านจาก result แล้ว (App.jsx:852) + JSON schema มี field ครบ (App.jsx:753); เพิ่ม prompt สั่ง AI กรอกค่า default ตามประเภทงาน (App.jsx:751-758) | ✅ แก้แล้ว |
 
 ---
 
@@ -145,8 +145,9 @@ pullAll()            → select quotes (deleted_at is null) + price_db
 - ส่วน Anthropic path ที่ใช้ Claude จริง → คง label "Claude" ไว้
 
 **4c) AI fields (P1-12):**
-- เพิ่ม `overheadPct`, `discount`, `paymentTerms` ใน JSON schema ของ prompt (App.jsx:1453)
-- แก้ `createQuoteFromResult` อ่านจาก result แทน hardcode 0 (App.jsx:1612-1617)
+- เพิ่ม `overheadPct`, `discount`, `paymentTerms` ใน JSON schema ของ prompt (App.jsx:753)
+- แก้ `createQuoteFromResult` อ่านจาก result แทน hardcode 0 (App.jsx:852)
+- เพิ่ม "กฎค่าทางการเงิน" ใน systemPromptBase (App.jsx:751-758) — สั่ง AI กรอก default overhead 10-20% / discount เฉพาะที่ระบุ / paymentTerms default 50-50
 
 **แก้:** P0-6, P1-11, P1-12
 **ไฟล์แก้:** `src/App.jsx`
@@ -174,7 +175,7 @@ pullAll()            → select quotes (deleted_at is null) + price_db
 | 5 | Phase 4 — Dead code/label/AI | ทำ parallel กับ 3-4 | checkpoint 7 | ⚠️ AI label ค้าง |
 | 6 | Phase 5 — ย้ายเครื่อง | Phase 2-3 เสร็จ | checkpoint 6 | ✅ เสร็จ |
 
-> ✅ **Phase 0-5 เสร็จเรียบร้อย** ยกเว้น P1-11 (label "Claude") + P1-12 (AI overhead/discount)
+> ✅ **Phase 0-5 เสร็จเรียบร้อยทุกข้อ** (รวม P1-11 + P1-12)
 
 ---
 

@@ -749,6 +749,10 @@ function AIAnalyzeScreen({ navTo, priceDb, setPriceDb, saveQuote, showToast }) {
 
   const priceDbCompact = priceDb.map(p => `${p.name}|${p.unit}|${p.price}`).join(";");
   const systemPromptBase = `ผู้ช่วยออกใบเสนอราคาก่อสร้าง ตอบ JSON เท่านั้น ห้ามมีข้อความอื่น
+กฎค่าทางการเงิน:
+- overheadPct: ค่าดำเนินการ+กำไร (%). ถ้าผู้ใช้ไม่ระบุ ใส่ 10 (งานทั่วไป) / 15 (งานซ่อม-renovate) / 20 (งานด่วน)
+- discount: ส่วนลด (บาท). ใส่เฉพาะเมื่อผู้ใช้ระบุ; ถ้าไม่มี = 0
+- paymentTerms: เงื่อนไขชำระเงิน. ถ้าผู้ใช้ไม่ระบุ ใส่ "ชำระ 50% ก่อนเริ่มงาน, 50% หลังส่งมอบ"
 ราคางาน(ชื่อ|หน่วย|ราคา): ${priceDbCompact}
 JSON format: {"customerName":"","address":"","project":"","items":[{"name":"","qty":1,"unit":"","price":0}],"remarks":"","overheadPct":0,"discount":0,"paymentTerms":"","newPriceItems":[{"name":"","unit":"","price":0}]}
 newPriceItems=รายการใหม่ที่ไม่มีในฐานข้อมูล ใช้ราคาประมาณ`;
