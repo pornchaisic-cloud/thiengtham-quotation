@@ -114,7 +114,7 @@ export default function ViewQuoteScreen({ quote, navTo, deleteQuote, showToast }
         logoImageId = wb.addImage({ base64: logoB64, extension: "png" });
         ws.addImage(logoImageId, {
           tl: { col: 18, row: 1 },    // S2 (zero-indexed)
-          br: { col: 20.999, row: 6 }, // U6
+          br: { col: 20.999, row: 5.999 }, // U5.999 (avoid overshoot past row 6 boundary)
         });
       }
     } catch (e) {
