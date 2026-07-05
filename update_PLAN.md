@@ -2,10 +2,12 @@
 
 ## สถานะโค้ดปัจจุบัน
 
-- **Architecture:** localStorage-only (ไม่มี cloud sync จริง)
-- **ไฟล์หลัก:** `src/App.jsx` (~2067 บรรทัด, monolith)
-- **Supabase:** `src/lib/supabase.js` มีแค่ dead import ใน App.jsx:6
-- **Dependencies:** xlsx, html2canvas, jspdf เป็น npm แล้ว (checkpoint 1b ✅)
+- **Architecture:** localStorage + Supabase sync (Phase 0-5 เสร็จแล้ว — checkpoint 3-6)
+- **Supabase:** anonymous auth + RLS + sync layer ทำงานแล้ว
+- **Offline UI:** ConnectionBanner + pending queue ทำงานแล้ว
+- **Dead code:** Phase 1-3 ของ CLEANUP_PLAN เสร็จแล้ว (checkpoint 8)
+- **Excel/PDF layout:** เสร็จ Phase 1-6 (checkpoint 7) + bugfix T1+T2+T3 (checkpoint 16+17)
+- **Bugfix ล่าสุด:** subtotal fallback, PDF page Letter, logo anchor (checkpoint 16+17)
 
 ---
 
@@ -15,16 +17,16 @@
 |---|---|---|---|
 | P0-1 | ปุ่มดาวน์โหลดไม่เซฟไฟล์ | ใช้ blob download + a.click() + Filesystem/Share แล้ว | ✅ แก้แล้ว |
 | P0-2 | CDN dynamic inject | เปลี่ยนเป็น npm import แล้ว | ✅ แก้แล้ว |
-| P0-3 | deleteQuote ลบ local ก่อน cloud | ไม่มี cloud แล้ว ไม่ใช่ปัญหาตอนนี้ | ➖ ข้าม |
-| P0-4 | saveQuote fire-and-forget | sync pure local ไม่มี Promise | ➖ ข้าม |
-| P0-5 | useEffect catch เงียบ | ไม่มี fetch Supabase แล้ว | ➖ ข้าม |
-| P0-6 | Dead code | `pdfPreviewUrl`, `import { Browser }` ยังตายอยู่ | ⚠️ ต้องลบ |
-| P1-7 | sync ไม่ครบ | ไม่มี cloud | ➖ ข้าม |
-| P1-8 | ไม่มี offline UI | ไม่มี navigator.onLine / banner | ⚠️ ต้องแก้ |
-| P1-9 | API key hardcode | anon key ฝังใน supabase.js:8 | ⚠️ ต้องย้าย .env |
+| P0-3 | deleteQuote ลบ local ก่อน cloud | sync layer แก้แล้ว | ✅ แก้แล้ว |
+| P0-4 | saveQuote fire-and-forget | sync layer แก้แล้ว | ✅ แก้แล้ว |
+| P0-5 | useEffect catch เงียบ | sync layer แก้แล้ว | ✅ แก้แล้ว |
+| P0-6 | Dead code | Phase 1-3 CLEANUP เสร็จแล้ว | ✅ แก้แล้ว |
+| P1-7 | sync ไม่ครบ | sync layer + RLS เสร็จแล้ว | ✅ แก้แล้ว |
+| P1-8 | ไม่มี offline UI | ConnectionBanner + pending queue เสร็จแล้ว | ✅ แก้แล้ว |
+| P1-9 | API key hardcode | Phase 0 .env เสร็จแล้ว | ✅ แก้แล้ว |
 | P1-10 | form ไม่ reset | component remount แล้ว reset จริง | ✅ ไม่ใช่ปัญหา |
-| P1-11 | label "Claude" แต่ใช้ Gemini/Llama | บรรทัด 1634,1400,1475,1735 | ⚠️ ต้องแก้ |
-| P1-12 | AI ไม่ใช้ overhead/discount/terms | hardcode 0 + prompt ไม่ขอ | ⚠️ ต้องแก้ |
+| P1-11 | label "Claude" แต่ใช้ Gemini/Llama | ยังต้องตรวจ + แก้ | ⚠️ ค้าง |
+| P1-12 | AI ไม่ใช้ overhead/discount/terms | hardcode 0 + prompt ไม่ขอ | ⚠️ ค้าง |
 
 ---
 
@@ -163,14 +165,16 @@ pullAll()            → select quotes (deleted_at is null) + price_db
 
 ## ลำดับทำ (ตาม dependency)
 
-| ลำดับ | Phase | เริ่มหลัง | checkpoint |
-|---|---|---|---|
-| 1 | Phase 0 — .env | - | checkpoint 3 |
-| 2 | Phase 1 — Schema + Auth | Phase 0 | checkpoint 4 |
-| 3 | Phase 2 — Sync layer | Phase 1 | checkpoint 5 |
-| 4 | Phase 3 — Offline UI | Phase 2 | checkpoint 6 |
-| 5 | Phase 4 — Dead code/label/AI | ทำ parallel กับ 3-4 | checkpoint 7 |
-| 6 | Phase 5 — ย้ายเครื่อง | Phase 2-3 เสร็จ | checkpoint 8 |
+| ลำดับ | Phase | เริ่มหลัง | checkpoint | สถานะ |
+|---|---|---|---|---|
+| 1 | Phase 0 — .env | - | checkpoint 3 | ✅ เสร็จ |
+| 2 | Phase 1 — Schema + Auth | Phase 0 | checkpoint 4 | ✅ เสร็จ |
+| 3 | Phase 2 — Sync layer | Phase 1 | checkpoint 5 | ✅ เสร็จ |
+| 4 | Phase 3 — Offline UI | Phase 2 | checkpoint 6 | ✅ เสร็จ |
+| 5 | Phase 4 — Dead code/label/AI | ทำ parallel กับ 3-4 | checkpoint 7 | ⚠️ AI label ค้าง |
+| 6 | Phase 5 — ย้ายเครื่อง | Phase 2-3 เสร็จ | checkpoint 6 | ✅ เสร็จ |
+
+> ✅ **Phase 0-5 เสร็จเรียบร้อย** ยกเว้น P1-11 (label "Claude") + P1-12 (AI overhead/discount)
 
 ---
 

@@ -15,7 +15,17 @@
 ---
 
 **Checkpoint ล่าสุด:**
-- checkpoint 18 — Android build: foojay-resolver-convention plugin ดึง JDK 21 อัตโนมัติ
+- checkpoint 20 — add verification helpers for T1+T2+T3 (Playwright + APK marker check)
+  - `scripts/verify_android.cjs` (new) — smoke test helper: install APK + cold launch + tap main flows + check toast/logcat
+  - `scripts/verify_android.bat` (new) — Windows wrapper สำหรับ `verify_android.cjs`
+  - **Context**: checkpoint 13→14 lesson learned — build pass ≠ runtime work; APK ต้อง smoke test ก่อน ship
+  - **Usage**: `node scripts/verify_android.cjs` (หรือ `verify_android.bat`)
+
+- checkpoint 19 — RULES sync — document checkpoint 16 (T1+T2 bugfix), 17 (T3 bugfix), 18 (foojay JDK21)
+  - RULES.md: เพิ่ม checkpoint 16+17 ที่ document แล้ว (bugfix T1+T2+T3)
+  - **ไม่มีการแก้โค้ด** — pure documentation update
+
+- checkpoint 18 — Android build: foojay-resolver-convention plugin ดึง JDK 21 อัตโนมัติ — Android build: foojay-resolver-convention plugin ดึง JDK 21 อัตโนมัติ
   - `android/settings.gradle` — เพิ่ม `pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }` + `plugins { id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0' }`
   - **Root cause**: Capacitor 8 plugin (`@capacitor/filesystem@8.1.2`) ต้องการ JDK 21 — ถ้า dev เครื่องใหม่ไม่ได้ติดตั้ง + ไม่ได้ set `JAVA_HOME` → gradle build fail ด้วย `Could not find tools.jar` / `JAVA_HOME is set to an invalid directory`
   - **Fix**: foojay-resolver auto-download JDK 21 ตาม `toolchain.languageVersion` → ไม่ต้องติดตั้งมือ

@@ -11,22 +11,25 @@
 - ✅ inject TT-QN-062-26 fake quote + hijack `URL.createObjectURL` + extract blob
 - ✅ run `python scripts/compare_xlsx.py` (openpyxl) — ดู merged cells / widths / heights / cells / images
 - ✅ run `python scripts/compare_pdf.py` (PyMuPDF) — ดู page size + text
-- ❌ **ยังไม่ได้ทำ**: render PDF ทั้ง 2 ฝั่งเป็น PNG เพื่อเทียบ layout ด้วยตา (เพราะ app PDF เป็น image-based ดู text ไม่ได้)
+- ✅ **เสร็จแล้วทุก T0-T3** (checkpoint 16+17)
 
 ---
 
 ## Tasks (เรียงตาม priority)
 
 ### T0 — Visual rendering compare (ทำก่อน — ใช้เวลา 5 นาที)
-- [ ] เขียน `scripts/render_compare.py` — PyMuPDF render `reference.pdf` → `scripts/_ref_render.png`, `scripts/app_qn062.pdf` → `scripts/_app_render.png` (DPI 150)
-- [ ] รัน + ดูทั้ง 2 ภาพแบบ side-by-side
-- [ ] บันทึกผล visual diff ลง RULES.md
+- [x] เขียน `scripts/render_compare.py` — PyMuPDF render `reference.pdf` → `scripts/_ref_render.png`, `scripts/app_qn062.pdf` → `scripts/_app_render.png` (DPI 150)
+- [x] รัน + ดูทั้ง 2 ภาพแบบ side-by-side
+- [x] บันทึกผล visual diff ลง RULES.md
 
 **เหตุผล**: ถ้า visual diff เจอปัญหาเพิ่ม (เช่น font ผิด, layout เลื่อน) อาจต้องขยาย scope — รู้ก่อนแก้ดีกว่า
+
+> **สถานะ: เสร็จแล้ว** (checkpoint 16 ทำรวมกับ T1+T2)
 
 ---
 
 ### T1 — Fix subtotal fallback (priority: 🔴 high — real bug)
+> ✅ **เสร็จแล้ว** (checkpoint 16)
 **File**: `src/components/ViewQuoteScreen.jsx`
 - Line 29: `const subtotal = Number(quote.subtotal || 0);`
 - Line 611: เหมือนกัน
@@ -59,6 +62,7 @@ const subtotal = Number(quote.subtotal) ||
 ---
 
 ### T2 — Fix PDF page size A4 → Letter (priority: 🟡 medium — print impact)
+> ✅ **เสร็จแล้ว** (checkpoint 16)
 **File**: `src/components/ViewQuoteScreen.jsx` (หาจุดที่เรียก `new jsPDF()`)
 
 **Root cause**: jspdf default = A4 (8.27×11.69")
@@ -83,6 +87,7 @@ const pdf = new jsPDF({ unit: "pt", format: "letter" }); // 612 x 792 pt
 ---
 
 ### T3 — Fix logo image anchor overshoot 1 row (priority: 🟢 low — visual only)
+> ✅ **เสร็จแล้ว** (checkpoint 17)
 **File**: `src/components/ViewQuoteScreen.jsx:106`
 
 **Root cause**:
@@ -114,19 +119,16 @@ br: { col: 20.999, row: 5.999 },
 ## Execution plan (เรียงตามลำดับ)
 
 ```
-T0 (visual verify, 5 min)
+T0 (visual verify)     ✅ done
    ↓
-T1 (subtotal — high impact, real bug) → checkpoint 16.1
-   ↓  (re-run compare after T1)
-T2 (PDF page size) + T3 (logo anchor) → checkpoint 16.2 (รวม)
+T1 (subtotal)         ✅ checkpoint 16
+T2 (PDF size)          ✅ checkpoint 16
+T3 (logo anchor)       ✅ checkpoint 17
    ↓
-T0-final (re-render + final compare)
+T0-final (re-verify)  ✅ checkpoint 16+17
 ```
 
-หรือถ้าอยาก fix ครบใน checkpoint 16 เดียว:
-```
-T0 → T1+T2+T3 → T0-final → checkpoint 16
-```
+✅ **ทั้ง 4 tasks เสร็จเรียบร้อย** (checkpoint 16 + 17)
 
 ---
 
@@ -147,11 +149,11 @@ T0 → T1+T2+T3 → T0-final → checkpoint 16
 
 ## Risk matrix
 
-| Bug | Severity | Scope | User-impact |
-|---|---|---|---|
-| T1 subtotal=0 | 🔴 High | ทุก quote ที่ไม่ใช่ UI-saved | Grand total ผิด ใน Excel export |
-| T2 PDF size A4 | 🟡 Med | PDF export ทุกใบ | Print preview ผิดขนาด/อาจตัดขอบ |
-| T3 logo row+1 | 🟢 Low | Logo image | Layout 1 row เลื่อน, ตาเห็นได้ |
+| Bug | Severity | Scope | User-impact | สถานะ |
+|---|---|---|---|---|
+| T1 subtotal=0 | 🔴 High | ทุก quote ที่ไม่ใช่ UI-saved | Grand total ผิด ใน Excel export | ✅ แก้แล้ว |
+| T2 PDF size A4 | 🟡 Med | PDF export ทุกใบ | Print preview ผิดขนาด/อาจตัดขอบ | ✅ แก้แล้ว |
+| T3 logo row+1 | 🟢 Low | Logo image | Layout 1 row เลื่อน, ตาเห็นได้ | ✅ แก้แล้ว |
 
 ---
 
