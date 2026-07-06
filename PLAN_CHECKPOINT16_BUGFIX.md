@@ -132,6 +132,19 @@ T0-final (re-verify)  ✅ checkpoint 16+17
 
 ---
 
+## Post-completion follow-ups
+
+งานที่เกิดขึ้นหลัง T1+T2+T3 เสร็จ — เพื่อกันไม่ให้ bug แบบเดียวกันกลับมา:
+
+- **checkpoint 18** — foojay-resolver-convention plugin (auto-download JDK 21) — กัน build fail บน dev เครื่องใหม่ที่ไม่ได้ติดตั้ง JDK 21 (Capacitor 8 ต้องการ)
+- **checkpoint 19** — RULES sync 16+17+18 (pure documentation)
+- **checkpoint 20** — `scripts/verify_android.cjs` + `scripts/verify_android.bat` — smoke test helper (install APK + cold launch + tap main flows + check toast/logcat) — บังคับใช้หลังทุก APK change (RULES.md rule 11)
+- **checkpoint 21** — P1-12 AI prompt: populate overheadPct/discount/paymentTerms defaults — แก้ที่ AI ไม่ได้ populate ค่า default ทำให้ grand total ผิด (คล้าย T1 แต่ที่ AI layer)
+
+> **Lesson**: หลังเจอ bug class ใหม่ ควรสร้าง helper ป้องกันไม่ให้กลับมา — T1+T2+T3 → checkpoint 20 verification helper
+
+---
+
 ## Verify protocol ทุก fix (RULES.md rule 11)
 
 1. **แก้ไขโค้ด** (atomic edit ต่อ bug)
@@ -173,3 +186,9 @@ T0-final (re-verify)  ✅ checkpoint 16+17
 ### Rollback
 - git tag ก่อนแก้: `pre-checkpoint-16-bugfix`
 - หรือ commit "checkpoint 15 (pre-bugfix)" ก่อน
+
+### แผนอื่นที่เกี่ยวข้อง
+- `update_PLAN.md` — แผนหลัก (Phase 11 = T1+T2+T3, Phase 14 = AI prompt defaults)
+- `PLAN_EXCEL_PDF_MATCH.md` — Phase 10 refine (checkpoint 15) ที่มา verify ก่อน → เจอ T1+T2+T3
+- `CLEANUP_PLAN.md` — Phase 1-7 cleanup (checkpoint 8-12) ที่มาก่อน Phase 11
+- `RULES.md` rule 11 — บังคับ smoke test APK หลังแก้ (เพิ่มใน checkpoint 20)

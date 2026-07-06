@@ -7,11 +7,11 @@
 
 ## สถานะรวม
 
-> ✅ **เสร็จเรียบร้อย** (Phase 1-6 → checkpoint 7; T1+T2+T3 → checkpoint 16+17)
+> ✅ **เสร็จเรียบร้อย** (Phase 1-6 → checkpoint 7; Phase 10 refine → checkpoint 15; T1+T2+T3 → checkpoint 16+17)
 
 ---
 
-## งานด่วน / เปิดค้างไว้
+## งานที่ทำเสร็จทั้งหมด
 
 ### ✅ ที่ทำไปแล้ว (3-4 ก.ค. 2569)
 - [x] วิเคราะห์โครงสร้างไฟล์จริงใน `D:\เที่ยงทำ ดีเวลล็อปเมนท์\ใบเสนอราคา\QN 26\` (TT-QN-056-26, TT-QN-037-26)
@@ -24,6 +24,8 @@
 - [x] **Phase 4**: ปรับ `buildPdfBlob()` HTML template ให้เหมือน QN 26 (header, customer info, items, summary, signature 3 ฝ่าย)
 - [x] **Phase 5**: เปลี่ยน default installments จาก 3 งวด (50/30/20) → 2 งวด 50/50 (label "ก่อนเริ่มงาน" + "หลังส่งมอบงาน" ตามต้นฉบับ 124/128 ใบ)
 - [x] **Phase 6**: ปรับปรุง label การคำนวณ (Overhead&Profit + รวมเป็นเงิน + GROSS TOTAL + ภาษีมูลค่าเพิ่ม 7% + ยอดเงินสุทธิ + NET GROSS)
+- [x] **Phase 10 (Refine)**: taxId จริง `1729900082674`, address "(สำนักงานใหญ่)", logo fallback `getDefaultLogoBase64()`, signature skip-if-path-only, label cells ("ชื่อผู้รับเหมา" A2:C2, "เลขประจำตัวผู้เสียภาษี" A5:D5), `wb.creator = subcontractorName`, PDF header "ชื่อผู้รับเหมา" font 15→13px (checkpoint 15)
+- [x] **T1+T2+T3 (Bugfix)**: T1 subtotal fallback (quote.items.reduce), T2 PDF A4→Letter, T3 logo anchor row 6→5.999 (checkpoint 16+17)
 
 ### สรุปจากข้อมูลจริง QN 26 (128 ใบ, extract ด้วย scripts/extract_qn26.py)
 - 124 ใบ (97%) ใช้ 2 งวด 50/50 label "ก่อนเริ่มงาน" + "หลังส่งมอบงาน"
@@ -81,6 +83,31 @@
 
 ---
 
+### Phase 10 (Refine): ข้อมูลบริษัทจริง + Logo/Signature fallback (checkpoint 15)
+
+**ไฟล์**: `src/utils/helpers.js`, `src/components/ViewQuoteScreen.jsx`
+
+**เปลี่ยน:**
+1. `address` → เพิ่ม "(สำนักงานใหญ่)" ท้ายที่อยู่ (ตรงตาม ภ.พ.20)
+2. `taxId`: `1729900000000` → **`1729900082674`** (เลขจริงที่ใช้ในใบเสนอราคา บริษัท เที่ยงทำฯ)
+3. `getDefaultLogoBase64()` — preload `/logo.png` เป็น base64 (cache) เพื่อให้ `ExcelJS.addImage()` ใช้ได้แม้ `quote.logo` เป็นแค่ path
+
+**Layout fixes:**
+4. Logo block: fallback เป็น defaultLogoB64 เมื่อ `quote.logo.length <= 64` (path-only หรือไม่มี)
+5. Signature block: skip add image ถ้า `quote.signature.length <= 64` (กัน crash ตอน path-only)
+6. `ws.mergeCells("A2:C2")` + label "ชื่อผู้รับเหมา" — column A-C ของ row 2
+7. `ws.mergeCells("A5:D5")` + label "เลขประจำตัวผู้เสียภาษี" — column A-D ของ row 5 (taxId เดิมอยู่ที่ E5:I5 แล้ว)
+8. `wb.creator = COMPANY_INFO.subcontractorName || COMPANY_INFO.name` (เอกสาร QN 26 ระบุชื่อผู้รับเหมาเป็น metadata)
+9. PDF header: เปลี่ยนจากแสดง "ชื่อบริษัท" → "ชื่อผู้รับเหมา : {quote.subcontractorName}" (ตรง QN 26); ลด font 15px → 13px
+
+**Tools ใหม่:**
+- `scripts/_fix_image_blocks.py` — one-time patch script ที่ apply fallback fix ให้ logo + signature block
+- `scripts/peek_ref_top.py` — PyMuPDF inspect top of reference.pdf (font/size/bbox) ใช้ debug layout
+
+**Origin:** post-checkpoint 15 auto-export verification → เจอ T1+T2+T3 → แก้ใน checkpoint 16+17 (ดู `PLAN_CHECKPOINT16_BUGFIX.md`)
+
+---
+
 ## ข้อมูลอ้างอิง
 
 ### ไฟล์ต้นฉบับใน QN 26
@@ -101,3 +128,10 @@ Overhead&Profit = GROSS TOTAL * (overheadPct / 100)
 VAT 7%       = (GROSS TOTAL + Overhead) * 0.07
 NET GROSS    = GROSS TOTAL + Overhead + VAT
 ```
+
+---
+
+### แผนอื่นที่เกี่ยวข้อง
+- `update_PLAN.md` — แผนหลัก (Phase 6 = QN 26 layout, Phase 10 = refine, Phase 11 = T1+T2+T3)
+- `PLAN_CHECKPOINT16_BUGFIX.md` — bugfix ที่ verify หลัง Phase 10 (T1 subtotal fallback, T2 PDF size, T3 logo anchor)
+- `CLEANUP_PLAN.md` — Phase 7 code-split exceljs/html2canvas/jspdf (สำคัญต่อ bundle size ของ QN 26 export)

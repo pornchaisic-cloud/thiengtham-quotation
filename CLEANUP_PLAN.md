@@ -7,7 +7,7 @@
 
 ## สรุปปัญหาที่เจอ
 
-### ✅ Phase 1-6 (PLAN_EXCEL_PDF_MATCH.md) เสร็จแล้ว — แต่เจด dead code / dead imports เพิ่ม
+### ✅ Phase 1-6 (PLAN_EXCEL_PDF_MATCH.md) เสร็จแล้ว — รวม Phase 10 refine (checkpoint 15) — แต่เจอ dead code / dead imports เพิ่ม
 
 | # | ปัญหา | ไฟล์ | ผลกระทบ |
 |---|---|---|---|
@@ -259,5 +259,13 @@ async function buildPdfBlob() {
 - `scripts/check_imports2.cjs` — detailed import usage count + line numbers
 
 ### แผนอื่นที่เกี่ยวข้อง
-- `PLAN_EXCEL_PDF_MATCH.md` — เสร็จแล้ว (Phase 1-6, checkpoint 7)
-- `update_PLAN.md` — Supabase sync / offline UI / dead code (Phase 0-5, checkpoint 3-6)
+- `PLAN_EXCEL_PDF_MATCH.md` — เสร็จแล้ว (Phase 1-6 → checkpoint 7, Phase 10 refine → checkpoint 15, T1+T2+T3 → checkpoint 16+17)
+- `update_PLAN.md` — แผนหลักของโปรเจกต์ (Phase 0-14, checkpoint 1-21) — ครอบคลุม Supabase sync / offline UI / QN 26 layout / Android build / APK hotfix / foojay JDK21 / AI prompt
+- `PLAN_CHECKPOINT16_BUGFIX.md` — รายละเอียด bugfix T1+T2+T3 (checkpoint 16+17)
+
+### ⚠️ Lesson learned (จาก update_PLAN.md Phase 8 → Phase 9)
+- Phase 8 (checkpoint 13) ลบ storage permissions + `Directory.External` fallback โดยไม่ verify บน Android จริง → APK save ไฟล์ไม่ได้
+- Phase 9 (checkpoint 14) hotfix ด้วย 3-tier fallback + restore AndroidManifest permissions
+- **บทเรียน** → RULES.md rule 10-11:
+  - **Rule 10**: ห้ามลบ runtime-critical code (permissions, fallbacks, storage paths) โดยไม่ verify บน Android จริง
+  - **Rule 11**: ส่ง APK = ต้อง smoke test (install → tap main flows → ตรวจ toast / logcat) ไม่ใช่แค่ `gradlew build` ผ่าน
